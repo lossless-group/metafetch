@@ -4,6 +4,14 @@
 
 An Obsidian plugin that allows you to fetch Open Graph data from a URL using OpenGraph.io.
 
+## Why Care?  How we use it...
+
+We manage our site-wide content with Obsidian for ease of use and speed of development. We have a "toolkit" section (and subsections, as well as tag filters) for reviewing applications and web services. To make it more visually compelling, we use Open Graph data to display images and titles in our notes. 
+
+![Lossless Toolkit on The Lossless Group Website](https://i.imgur.com/WX7aIHB.gif)
+
+We use this plugin to fetch Open Graph data from a URL using OpenGraph.io.
+
 ## Features
 
 ### Command: Fetch Open Graph Data
