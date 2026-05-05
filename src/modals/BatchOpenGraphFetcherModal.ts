@@ -76,8 +76,11 @@ export class BatchOpenGraphFetcherModal extends Modal {
 
   async onOpen(): Promise<void> {
     const contentEl = this.contentEl as unknown as ObsidianHTMLElement;
+    const { modalEl } = this;
     contentEl.empty();
-    contentEl.addClass('opengraph-fetcher-modal');
+    // Attach to modalEl (outer .modal element) so width rules apply to the popup itself.
+    // See content-farm/context-v/issues/Widen-Modals-in-Obsidian-using-CSS.md
+    modalEl.addClass('batch-opengraph-fetcher-modal');
     
     await this.createHeader(contentEl);
     await this.createDirectorySection(contentEl);

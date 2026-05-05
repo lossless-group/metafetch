@@ -1,13 +1,18 @@
 /* src/styles/open-graph-fetcher.css */
 
+/* ============================================================
+   Modal width unlock — both modals attach their class to
+   modalEl (the OUTER .modal element) so width rules size the
+   popup itself, not just .modal-content. See:
+   content-farm/context-v/issues/Widen-Modals-in-Obsidian-using-CSS.md
+   ============================================================ */
+
 /* Batch Processing Modal */
 .batch-opengraph-fetcher-modal {
-  min-width: 860px !important;
-  width: 90vw !important;
-  max-width: 1260px !important;
-  height: 90vh !important;
-  max-height: 90vh !important;
-  padding: 1.5rem !important;
+  width: 90vw;
+  max-width: 1260px;
+  height: 90vh;
+  max-height: 90vh;
   box-sizing: border-box;
 }
 
@@ -15,7 +20,7 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  padding: 0;
+  padding: 1.5rem;
   box-sizing: border-box;
   gap: 1.5rem;
 }
@@ -289,11 +294,28 @@
   background-color: var(--background-modifier-hover);
 }
 
-/* Original Modal */
+/* Original (single-file) Modal */
 .opengraph-fetcher-modal {
-  min-width: 500px;
-  max-width: 600px;
+  width: 90vw;
+  max-width: 720px;
+}
+
+.opengraph-fetcher-modal .modal-content {
   padding: 24px;
+}
+
+/* ----- Responsive ----- */
+@media (max-width: 600px) {
+  .opengraph-fetcher-modal,
+  .batch-opengraph-fetcher-modal {
+    width: 95vw;
+    max-width: none;
+  }
+
+  .batch-opengraph-fetcher-modal {
+    height: 95vh;
+    max-height: 95vh;
+  }
 }
 
 .opengraph-header {
