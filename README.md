@@ -15,7 +15,7 @@ We use this plugin to fetch Open Graph data from a URL using OpenGraph.io.
 ## Features
 
 ### Command: Fetch Open Graph Data
-![Open-Graph-Fetcher Fetch OpenGraph Data for Current File](https://github.com/user-attachments/assets/19ad9691-74d0-4b6e-b4ce-3abb3adea407)
+![Metafetch — Fetch Open Graph Data for Current File](https://github.com/user-attachments/assets/19ad9691-74d0-4b6e-b4ce-3abb3adea407)
 
 - Opens a modal where the user can configure:
     - Whether to overwrite existing Open Graph data

@@ -26,7 +26,7 @@ interface OpenGraphPlugin {
   settings: PluginSettings;
 }
 
-export class BatchOpenGraphFetcherModal extends Modal {
+export class BatchMetafetchModal extends Modal {
   private settings: PluginSettings;
   private service: OpenGraphService;
   private scanner: DirectoryScanner;
@@ -80,7 +80,7 @@ export class BatchOpenGraphFetcherModal extends Modal {
     contentEl.empty();
     // Attach to modalEl (outer .modal element) so width rules apply to the popup itself.
     // See content-farm/context-v/issues/Widen-Modals-in-Obsidian-using-CSS.md
-    modalEl.addClass('batch-opengraph-fetcher-modal');
+    modalEl.addClass('batch-metafetch-modal');
     
     await this.createHeader(contentEl);
     await this.createDirectorySection(contentEl);
@@ -295,7 +295,7 @@ export class BatchOpenGraphFetcherModal extends Modal {
   private async createHeader(contentEl: ObsidianHTMLElement): Promise<void> {
     const header = contentEl.createDiv('opengraph-header');
     header.createEl('h2', { 
-      text: 'Batch OpenGraph Fetcher', 
+      text: 'Metafetch — Batch',
       cls: 'opengraph-title' 
     });
   }

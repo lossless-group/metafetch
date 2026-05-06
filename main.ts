@@ -1,9 +1,9 @@
 import { Notice, Plugin, Editor } from 'obsidian';
-import { OpenGraphFetcherModal } from './src/modals/OpenGraphFetcherModal';
-import { BatchOpenGraphFetcherModal } from './src/modals/BatchOpenGraphFetcherModal';
+import { MetafetchModal } from './src/modals/MetafetchModal';
+import { BatchMetafetchModal } from './src/modals/BatchMetafetchModal';
 import { OpenGraphSettingTab, DEFAULT_SETTINGS, type OpenGraphSettings } from './src/settings/settings';
 
-export default class OpenGraphPlugin extends Plugin {
+export default class MetafetchPlugin extends Plugin {
     settings!: OpenGraphSettings;
 
     async onload(): Promise<void> {
@@ -12,9 +12,9 @@ export default class OpenGraphPlugin extends Plugin {
         // Add ribbon icon
         const ribbonIconEl = this.addRibbonIcon(
             'external-link',
-            'Fetcher OpenGraph Data',
+            'Fetch Open Graph Data',
             () => {
-                new Notice('OpenGraph Fetcher is ready!');
+                new Notice('Metafetch is ready!');
             }
         );
         ribbonIconEl.addClass('metafetch-ribbon-icon');
@@ -38,18 +38,18 @@ export default class OpenGraphPlugin extends Plugin {
         // Command to fetch OpenGraph data for current file
         this.addCommand({
             id: 'fetch-opengraph-data',
-            name: 'Fetch OpenGraph Data for Current File',
+            name: 'Fetch Open Graph Data for Current File',
             editorCallback: (_editor: Editor) => {
-                new OpenGraphFetcherModal(this.app, this).open();
+                new MetafetchModal(this.app, this).open();
             }
         });
 
         // Command to batch process multiple files for OpenGraph data
         this.addCommand({
             id: 'batch-fetch-opengraph-data',
-            name: 'Batch Fetch OpenGraph Data',
+            name: 'Batch Fetch Open Graph Data',
             callback: () => {
-                new BatchOpenGraphFetcherModal(this.app, this).open();
+                new BatchMetafetchModal(this.app, this).open();
             }
         });
     }

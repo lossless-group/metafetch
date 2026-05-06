@@ -15,7 +15,7 @@ interface OpenGraphPlugin {
   settings: PluginSettings;
 }
 
-export class OpenGraphFetcherModal extends Modal {
+export class MetafetchModal extends Modal {
   private settings: PluginSettings;
   private service: OpenGraphService;
   private options: ModalOptions;
@@ -45,11 +45,11 @@ export class OpenGraphFetcherModal extends Modal {
     contentEl.empty();
     // Attach to modalEl (outer .modal element) so width rules apply to the popup itself.
     // See content-farm/context-v/issues/Widen-Modals-in-Obsidian-using-CSS.md
-    modalEl.addClass('opengraph-fetcher-modal');
+    modalEl.addClass('metafetch-modal');
     
     // Create header
     const header = contentEl.createDiv('opengraph-header');
-    header.createEl('h2', { text: 'OpenGraph Fetcher', cls: 'opengraph-title' });
+    header.createEl('h2', { text: 'Metafetch', cls: 'opengraph-title' });
 
     // Create options section with table layout
     const optionsContainer = contentEl.createDiv('opengraph-options-container');

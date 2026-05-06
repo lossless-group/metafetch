@@ -1,6 +1,6 @@
 // metafetch/src/settings/settings.ts
 import { App, PluginSettingTab, Setting } from 'obsidian';
-import OpenGraphPlugin from '../../main';
+import MetafetchPlugin from '../../main';
 
 export interface OpenGraphSettings {
     apiKey: string;
@@ -35,9 +35,9 @@ export const DEFAULT_SETTINGS: OpenGraphSettings = {
 };
 
 export class OpenGraphSettingTab extends PluginSettingTab {
-    plugin: OpenGraphPlugin;
+    plugin: MetafetchPlugin;
 
-    constructor(app: App, plugin: OpenGraphPlugin) {
+    constructor(app: App, plugin: MetafetchPlugin) {
         super(app, plugin);
         this.plugin = plugin;
     }
@@ -46,7 +46,7 @@ export class OpenGraphSettingTab extends PluginSettingTab {
         const { containerEl } = this;
         containerEl.empty();
 
-        containerEl.createEl('h2', { text: 'OpenGraph Fetcher Settings' });
+        containerEl.createEl('h2', { text: 'Metafetch Settings' });
 
         // API Key setting
         new Setting(containerEl)

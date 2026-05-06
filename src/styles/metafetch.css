@@ -8,7 +8,7 @@
    ============================================================ */
 
 /* Batch Processing Modal */
-.batch-opengraph-fetcher-modal {
+.batch-metafetch-modal {
   width: 90vw;
   max-width: 1260px;
   height: 90vh;
@@ -16,7 +16,7 @@
   box-sizing: border-box;
 }
 
-.batch-opengraph-fetcher-modal .modal-content {
+.batch-metafetch-modal .modal-content {
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -25,7 +25,7 @@
   gap: 1.5rem;
 }
 
-.batch-opengraph-fetcher-modal .file-list-container {
+.batch-metafetch-modal .file-list-container {
   flex: 1;
   overflow-y: auto;
   margin: 0;
@@ -33,24 +33,24 @@
 }
 
 /* Horizontal checkbox layout for batch modal */
-.batch-opengraph-fetcher-modal .opengraph-options-section {
+.batch-metafetch-modal .opengraph-options-section {
   margin-bottom: 28px;
   padding: 0 8px;
 }
 
-.batch-opengraph-fetcher-modal .opengraph-options-table {
+.batch-metafetch-modal .opengraph-options-table {
   width: 100%;
   border-collapse: collapse;
   margin: 0;
 }
 
-.batch-opengraph-fetcher-modal .opengraph-options-table tbody {
+.batch-metafetch-modal .opengraph-options-table tbody {
   display: flex;
   flex-wrap: wrap;
   gap: 16px;
 }
 
-.batch-opengraph-fetcher-modal .opengraph-option-row {
+.batch-metafetch-modal .opengraph-option-row {
   display: flex;
   align-items: center;
   padding: 8px 12px;
@@ -62,7 +62,7 @@
   min-width: 0;
 }
 
-.batch-opengraph-fetcher-modal .opengraph-checkbox-cell {
+.batch-metafetch-modal .opengraph-checkbox-cell {
   width: auto;
   padding: 0 8px 0 0;
   text-align: center;
@@ -70,20 +70,20 @@
   flex-shrink: 0;
 }
 
-.batch-opengraph-fetcher-modal .opengraph-label-cell {
+.batch-metafetch-modal .opengraph-label-cell {
   padding: 0;
   vertical-align: middle;
   flex: 1;
   min-width: 0;
 }
 
-.batch-opengraph-fetcher-modal .opengraph-option-container {
+.batch-metafetch-modal .opengraph-option-container {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 
-.batch-opengraph-fetcher-modal .opengraph-option-label {
+.batch-metafetch-modal .opengraph-option-label {
   cursor: pointer;
   color: var(--text-normal);
   font-size: 0.9em;
@@ -93,20 +93,20 @@
   font-weight: 500;
 }
 
-.batch-opengraph-fetcher-modal .opengraph-option-description {
+.batch-metafetch-modal .opengraph-option-description {
   color: var(--text-muted);
   font-size: 0.8em;
   line-height: 1.2;
   font-style: italic;
 }
 
-.batch-opengraph-fetcher-modal .opengraph-checkbox {
+.batch-metafetch-modal .opengraph-checkbox {
   margin: 0;
   transform: scale(1.0);
 }
 
 /* Directory section styling */
-.batch-opengraph-fetcher-modal .opengraph-options-container {
+.batch-metafetch-modal .opengraph-options-container {
   margin-bottom: 28px;
   display: flex;
   align-items: center;
@@ -114,47 +114,47 @@
   gap: 16px;
 }
 
-.batch-opengraph-fetcher-modal .opengraph-directory-info {
+.batch-metafetch-modal .opengraph-directory-info {
   flex: 1;
   min-width: 0;
 }
 
-.batch-opengraph-fetcher-modal .opengraph-directory-info p {
+.batch-metafetch-modal .opengraph-directory-info p {
   margin: 4px 0;
   color: var(--text-normal);
   font-size: 0.9em;
   line-height: 1.3;
 }
 
-.batch-opengraph-fetcher-modal .opengraph-directory-info p:first-child {
+.batch-metafetch-modal .opengraph-directory-info p:first-child {
   font-weight: 500;
   color: var(--text-accent);
 }
 
-.batch-opengraph-fetcher-modal .opengraph-button-group {
+.batch-metafetch-modal .opengraph-button-group {
   display: flex;
   align-items: center;
 }
 
-.batch-opengraph-fetcher-modal .opengraph-button-group button {
+.batch-metafetch-modal .opengraph-button-group button {
   margin-right: 12px;
 }
 
-.batch-opengraph-fetcher-modal .opengraph-button-group button:last-child {
+.batch-metafetch-modal .opengraph-button-group button:last-child {
   margin-right: 0;
 }
 
 /* File list section styling */
-.batch-opengraph-fetcher-modal .opengraph-file-section {
+.batch-metafetch-modal .opengraph-file-section {
   margin-bottom: 28px;
   padding: 0 8px;
 }
 
-.batch-opengraph-fetcher-modal .opengraph-file-list {
+.batch-metafetch-modal .opengraph-file-list {
   margin-top: 12px;
 }
 
-.batch-opengraph-fetcher-modal .batch-no-files {
+.batch-metafetch-modal .batch-no-files {
   padding: 24px;
   text-align: center;
   color: var(--text-muted);
@@ -165,7 +165,7 @@
 }
 
 /* Batch delay container styling */
-.batch-opengraph-fetcher-modal .batch-delay-container {
+.batch-metafetch-modal .batch-delay-container {
   margin: 16px 0;
   padding: 16px 20px;
   background: var(--background-secondary);
@@ -173,7 +173,7 @@
   border: 1px solid var(--background-modifier-border);
 }
 
-.batch-opengraph-fetcher-modal .batch-delay-container label {
+.batch-metafetch-modal .batch-delay-container label {
   display: block;
   margin-bottom: 12px;
   font-weight: 500;
@@ -181,13 +181,13 @@
   font-size: 0.95em;
 }
 
-.batch-opengraph-fetcher-modal .batch-delay-container input[type=range] {
+.batch-metafetch-modal .batch-delay-container input[type=range] {
   width: 100%;
   margin-bottom: 12px;
   height: 6px;
 }
 
-.batch-opengraph-fetcher-modal .batch-delay-container span {
+.batch-metafetch-modal .batch-delay-container span {
   font-weight: 600;
   color: var(--text-accent);
   font-size: 0.9em;
@@ -198,12 +198,12 @@
 
 
 /* Progress section styling */
-.batch-opengraph-fetcher-modal .opengraph-progress-section {
+.batch-metafetch-modal .opengraph-progress-section {
   margin-bottom: 16px;
   flex-shrink: 0;
 }
 
-.batch-opengraph-fetcher-modal .opengraph-status {
+.batch-metafetch-modal .opengraph-status {
   margin: 0 0 16px 0;
   padding: 12px 16px;
   background: var(--background-secondary);
@@ -215,7 +215,7 @@
   font-size: 0.95em;
 }
 
-.batch-opengraph-fetcher-modal .opengraph-progress {
+.batch-metafetch-modal .opengraph-progress {
   width: 100%;
   height: 6px;
   margin: 0 0 16px 0;
@@ -226,20 +226,20 @@
 }
 
 /* File List Table */
-.batch-opengraph-fetcher-table {
+.batch-metafetch-table {
   width: 100%;
   border-collapse: collapse;
   margin: 0;
 }
 
-.batch-opengraph-fetcher-table th,
-.batch-opengraph-fetcher-table td {
+.batch-metafetch-table th,
+.batch-metafetch-table td {
   padding: 0.75rem 1rem;
   text-align: left;
   border-bottom: 1px solid var(--background-modifier-border);
 }
 
-.batch-opengraph-fetcher-table th {
+.batch-metafetch-table th {
   font-weight: 600;
   color: var(--text-muted);
   background-color: var(--background-primary);
@@ -248,7 +248,7 @@
   z-index: 1;
 }
 
-.batch-opengraph-fetcher-table tr:hover {
+.batch-metafetch-table tr:hover {
   background-color: var(--background-modifier-hover);
 }
 
@@ -295,24 +295,24 @@
 }
 
 /* Original (single-file) Modal */
-.opengraph-fetcher-modal {
+.metafetch-modal {
   width: 90vw;
   max-width: 720px;
 }
 
-.opengraph-fetcher-modal .modal-content {
+.metafetch-modal .modal-content {
   padding: 24px;
 }
 
 /* ----- Responsive ----- */
 @media (max-width: 600px) {
-  .opengraph-fetcher-modal,
-  .batch-opengraph-fetcher-modal {
+  .metafetch-modal,
+  .batch-metafetch-modal {
     width: 95vw;
     max-width: none;
   }
 
-  .batch-opengraph-fetcher-modal {
+  .batch-metafetch-modal {
     height: 95vh;
     max-height: 95vh;
   }
