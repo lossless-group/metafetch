@@ -1,10 +1,10 @@
 import { Notice, Plugin, Editor } from 'obsidian';
 import { MetafetchModal } from './src/modals/MetafetchModal';
 import { BatchMetafetchModal } from './src/modals/BatchMetafetchModal';
-import { OpenGraphSettingTab, DEFAULT_SETTINGS, type OpenGraphSettings } from './src/settings/settings';
+import { MetafetchSettingTab, DEFAULT_SETTINGS, type MetafetchSettings } from './src/settings/settings';
 
 export default class MetafetchPlugin extends Plugin {
-    settings!: OpenGraphSettings;
+    settings!: MetafetchSettings;
 
     async onload(): Promise<void> {
         await this.loadSettings();
@@ -20,7 +20,7 @@ export default class MetafetchPlugin extends Plugin {
         ribbonIconEl.addClass('metafetch-ribbon-icon');
 
         // This adds a settings tab so the user can configure various aspects of the plugin
-        this.addSettingTab(new OpenGraphSettingTab(this.app, this));
+        this.addSettingTab(new MetafetchSettingTab(this.app, this));
 
         // Register commands
         this.registerCommands();

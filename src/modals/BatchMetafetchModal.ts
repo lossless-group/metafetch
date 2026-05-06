@@ -22,7 +22,7 @@ type ObsidianHTMLElement = HTMLElement & {
   closest: (selector: string) => HTMLElement | null;
 };
 
-interface OpenGraphPlugin {
+interface MetafetchPlugin {
   settings: PluginSettings;
 }
 
@@ -49,7 +49,7 @@ export class BatchMetafetchModal extends Modal {
   private loadingMessageIntervalId: number | null = null;
   private typedInstance: Typed | null = null;
 
-  constructor(app: App, plugin: OpenGraphPlugin) {
+  constructor(app: App, plugin: MetafetchPlugin) {
     super(app);
     this.settings = plugin.settings;
     this.service = new OpenGraphService(this.settings);

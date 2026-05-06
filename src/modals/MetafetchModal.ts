@@ -11,7 +11,7 @@ interface ModalOptions {
   updateFetchDate: boolean;
 }
 
-interface OpenGraphPlugin {
+interface MetafetchPlugin {
   settings: PluginSettings;
 }
 
@@ -28,7 +28,7 @@ export class MetafetchModal extends Modal {
   private loadingMessageIntervalId: number | null = null;
   private typedInstance: Typed | null = null;
 
-  constructor(app: App, plugin: OpenGraphPlugin) {
+  constructor(app: App, plugin: MetafetchPlugin) {
     super(app);
     this.settings = plugin.settings;
     this.service = new OpenGraphService(this.settings);

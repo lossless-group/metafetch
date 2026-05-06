@@ -2,7 +2,7 @@
 import { App, PluginSettingTab, Setting } from 'obsidian';
 import MetafetchPlugin from '../../main';
 
-export interface OpenGraphSettings {
+export interface MetafetchSettings {
     apiKey: string;
     baseUrl: string;
     apiUrl: string;
@@ -18,7 +18,7 @@ export interface OpenGraphSettings {
     fetchDateFieldName: string;
 }
 
-export const DEFAULT_SETTINGS: OpenGraphSettings = {
+export const DEFAULT_SETTINGS: MetafetchSettings = {
     apiKey: '',
     baseUrl: 'https://api.opengraph.io',
     apiUrl: 'https://opengraph.io/api/1.1/site',
@@ -34,7 +34,7 @@ export const DEFAULT_SETTINGS: OpenGraphSettings = {
     fetchDateFieldName: 'og_last_fetch'
 };
 
-export class OpenGraphSettingTab extends PluginSettingTab {
+export class MetafetchSettingTab extends PluginSettingTab {
     plugin: MetafetchPlugin;
 
     constructor(app: App, plugin: MetafetchPlugin) {

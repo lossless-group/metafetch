@@ -29,6 +29,6 @@ export interface OpenGraphData {
   fetchDate?: string;
 }
 
-export interface OpenGraphPluginSettingsTab extends PluginSettingTab {
-  plugin: OpenGraphPlugin;
+export interface MetafetchPluginSettingsTab extends PluginSettingTab {
+  plugin: MetafetchPlugin;
 }

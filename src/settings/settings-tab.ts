@@ -1,10 +1,10 @@
 import { PluginSettingTab, Setting, App } from 'obsidian';
-import OpenGraphPlugin from '../../main';
+import MetafetchPlugin from '../../main';
 
-export class OpenGraphPluginSettingsTab extends PluginSettingTab {
-    plugin: OpenGraphPlugin;
+export class MetafetchPluginSettingsTab extends PluginSettingTab {
+    plugin: MetafetchPlugin;
 
-    constructor(app: App, plugin: OpenGraphPlugin) {
+    constructor(app: App, plugin: MetafetchPlugin) {
         super(app, plugin);
         this.plugin = plugin;
     }
@@ -12,7 +12,7 @@ export class OpenGraphPluginSettingsTab extends PluginSettingTab {
     display(): void {
         const { containerEl } = this;
         containerEl.empty();
-        containerEl.createEl('h2', { text: 'OpenGraph Fetcher Settings' });
+        containerEl.createEl('h2', { text: 'Metafetch Settings' });
 
         new Setting(containerEl)
             .setName('OpenGraph API Key')
@@ -93,7 +93,7 @@ export class OpenGraphPluginSettingsTab extends PluginSettingTab {
             });
 
         containerEl.empty();
-        containerEl.createEl('h2', { text: 'OpenGraph Fetcher Settings' });
+        containerEl.createEl('h2', { text: 'Metafetch Settings' });
 
         new Setting(containerEl)
             .setName('OpenGraph API Key')
@@ -174,7 +174,7 @@ export class OpenGraphPluginSettingsTab extends PluginSettingTab {
             });
 
         containerEl.empty();
-        containerEl.createEl('h2', { text: 'OpenGraph Fetcher Settings' });
+        containerEl.createEl('h2', { text: 'Metafetch Settings' });
 
         new Setting(containerEl)
             .setName('OpenGraph API Key')
