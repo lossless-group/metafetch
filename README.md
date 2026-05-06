@@ -1,6 +1,6 @@
-![Open Graph Fetcher: An Obsidian Community Plugin by The Lossless Group](https://i.imgur.com/0v6sPkv.png)
+![Metafetch: An Obsidian Community Plugin by The Lossless Group](https://i.imgur.com/0v6sPkv.png)
 
-# Open Graph Fetcher Obsidian Plugin
+# Metafetch Obsidian Plugin
 
 An Obsidian plugin that allows you to fetch Open Graph data from a URL using OpenGraph.io.
 
@@ -42,16 +42,16 @@ We use this plugin to fetch Open Graph data from a URL using OpenGraph.io.
 
 1. Install the plugin from the Obsidian Plugin Marketplace.
 
-2. In Community Plugins, search for "Open Graph Fetcher" and install it.
+2. In Community Plugins, search for "Metafetch" and install it.
 
-3. From the Settings tab, click on "Open Graph Fetcher" and configure the settings.
+3. From the Settings tab, click on "Metafetch" and configure the settings.
 
 _This [Obsidian](https://obsidian.md/) plugin works only for [OpenGraph.io](https://opengraph.io/)_
 <a href="https://opengraph.io/"><img width="252" height="42" alt="trademark_OpenGraph-io" src="https://github.com/user-attachments/assets/08797db6-8fe7-4ced-a4fe-2ad4df79c26a" /></a>
 
 4. Add your OpenGraph.io API key to the settings.
 
-5. Open the Command Palette with `Command + P` (or `Control + P` on Windows & Linux) and type "Open Graph Fetcher".
+5. Open the Command Palette with `Command + P` (or `Control + P` on Windows & Linux) and type "Metafetch".
 
 6. Select "Fetch Open Graph Data for Current File".
 

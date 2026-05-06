@@ -1,4 +1,4 @@
-// open-graph-fetcher/src/settings/settings.ts
+// metafetch/src/settings/settings.ts
 import { App, PluginSettingTab, Setting } from 'obsidian';
 import OpenGraphPlugin from '../../main';
 

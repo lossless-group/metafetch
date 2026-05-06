@@ -17,7 +17,7 @@ export default class OpenGraphPlugin extends Plugin {
                 new Notice('OpenGraph Fetcher is ready!');
             }
         );
-        ribbonIconEl.addClass('open-graph-fetcher-ribbon-icon');
+        ribbonIconEl.addClass('metafetch-ribbon-icon');
 
         // This adds a settings tab so the user can configure various aspects of the plugin
         this.addSettingTab(new OpenGraphSettingTab(this.app, this));

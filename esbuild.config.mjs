@@ -3,7 +3,7 @@ import process from 'node:process';
 import builtins from 'builtin-modules';
 
 const banner = `/*
- * Open Graph Fetcher
+ * Metafetch
  * Generated: ${new Date().toISOString()}
  * Build: ${process.env.NODE_ENV || 'master'}
  */`;
@@ -29,7 +29,7 @@ const external = [
 
 // First, build the CSS file
 await esbuild.build({
-  entryPoints: ['src/styles/open-graph-fetcher.css'],
+  entryPoints: ['src/styles/metafetch.css'],
   bundle: true,
   minify: isProduction,
   outfile: 'styles.css',
