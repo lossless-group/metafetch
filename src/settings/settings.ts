@@ -3,6 +3,7 @@ import { App, PluginSettingTab, Setting } from 'obsidian';
 import MetafetchPlugin from '../../main';
 
 export interface MetafetchSettings {
+    // Provider: OpenGraph.io
     apiKey: string;
     baseUrl: string;
     apiUrl: string;
@@ -10,12 +11,20 @@ export interface MetafetchSettings {
     backoffDelay: number;
     rateLimit: number;
     cacheDuration: number;
-    // Field name mappings
+
+    // Provider: Microlink
+    microlinkApiKey: string;
+
+    // Field name mappings (used by every fetcher)
     titleFieldName: string;
     descriptionFieldName: string;
     imageFieldName: string;
     faviconFieldName: string;
     fetchDateFieldName: string;
+    siteNameFieldName: string;
+    typeFieldName: string;
+    authorsFieldName: string;
+    publishedDateFieldName: string;
 }
 
 export const DEFAULT_SETTINGS: MetafetchSettings = {
@@ -26,12 +35,18 @@ export const DEFAULT_SETTINGS: MetafetchSettings = {
     backoffDelay: 1000,
     rateLimit: 60,
     cacheDuration: 86400, // 24 hours
-    // Default field names
+
+    microlinkApiKey: '',
+
     titleFieldName: 'og_title',
     descriptionFieldName: 'og_description',
     imageFieldName: 'og_image',
     faviconFieldName: 'og_favicon',
-    fetchDateFieldName: 'og_last_fetch'
+    fetchDateFieldName: 'og_last_fetch',
+    siteNameFieldName: 'og_site_name',
+    typeFieldName: 'og_type',
+    authorsFieldName: 'authors',
+    publishedDateFieldName: 'og_published',
 };
 
 export class MetafetchSettingTab extends PluginSettingTab {
@@ -42,16 +57,43 @@ export class MetafetchSettingTab extends PluginSettingTab {
         this.plugin = plugin;
     }
 
+    /**
+     * Build a collapsible <details> section. Each provider gets its own; all
+     * default-open for now since we have only a handful. Pass { open: false }
+     * once the list grows past ~3 to keep the panel scannable.
+     *
+     * Uses document.createElement instead of containerEl.createEl because
+     * Obsidian's typed createEl overloads for 'details'/'summary' do not
+     * accept cls/attr options under exactOptionalPropertyTypes.
+     */
+    private createSection(title: string, opts: { open?: boolean } = {}): HTMLElement {
+        const details = document.createElement('details');
+        details.className = 'metafetch-settings-section';
+        if (opts.open !== false) details.setAttribute('open', '');
+
+        const summary = document.createElement('summary');
+        summary.textContent = title;
+        summary.className = 'metafetch-settings-summary';
+        details.appendChild(summary);
+
+        this.containerEl.appendChild(details);
+        return details;
+    }
+
     display(): void {
         const { containerEl } = this;
         containerEl.empty();
 
         containerEl.createEl('h2', { text: 'Metafetch Settings' });
 
-        // API Key setting
-        new Setting(containerEl)
+        // ============================================================
+        // Provider: OpenGraph.io
+        // ============================================================
+        const ogIo = this.createSection('Provider: OpenGraph.io');
+
+        new Setting(ogIo)
             .setName('OpenGraph.io API Key')
-            .setDesc('Enter your OpenGraph.io API key. Get your free key from https://www.opengraph.io/')
+            .setDesc('Required for the OpenGraph.io commands. Get a free key at https://www.opengraph.io/')
             .addText(text => text
                 .setPlaceholder('Enter your API key')
                 .setValue(this.plugin.settings.apiKey)
@@ -60,8 +102,7 @@ export class MetafetchSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 }));
 
-        // Base URL setting
-        new Setting(containerEl)
+        new Setting(ogIo)
             .setName('Base URL')
             .setDesc('OpenGraph.io API base URL')
             .addText(text => text
@@ -72,8 +113,7 @@ export class MetafetchSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 }));
 
-        // API URL setting
-        new Setting(containerEl)
+        new Setting(ogIo)
             .setName('API URL')
             .setDesc('OpenGraph.io API endpoint URL')
             .addText(text => text
@@ -84,8 +124,7 @@ export class MetafetchSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 }));
 
-        // Retries setting
-        new Setting(containerEl)
+        new Setting(ogIo)
             .setName('Retries')
             .setDesc('Number of retry attempts for failed requests')
             .addSlider(slider => slider
@@ -96,8 +135,7 @@ export class MetafetchSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 }));
 
-        // Rate limit setting
-        new Setting(containerEl)
+        new Setting(ogIo)
             .setName('Rate Limit')
             .setDesc('Maximum requests per minute')
             .addSlider(slider => slider
@@ -108,84 +146,81 @@ export class MetafetchSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 }));
 
-        // Field name mappings section
-        containerEl.createEl('h3', { text: 'Field Name Mappings' });
-        const fieldMappingDesc = containerEl.createEl('p', { 
-            text: 'Customize the field names used in your frontmatter for OpenGraph metadata.'
+        // ============================================================
+        // Provider: Microlink
+        // ============================================================
+        const micro = this.createSection('Provider: Microlink');
+
+        const microIntro = micro.createEl('p', {
+            text: 'The free tier allows ~50 requests/day per IP without a key. Add a key here only if you need higher limits.',
         });
-        fieldMappingDesc.addClass('setting-item-description');
+        microIntro.addClass('setting-item-description');
 
-        // Title field name
-        new Setting(containerEl)
-            .setName('Title Field Name')
-            .setDesc('Field name for the OpenGraph title')
+        new Setting(micro)
+            .setName('Microlink API Key (optional)')
+            .setDesc('Sent as the `x-api-key` header. Leave empty to use the anonymous free tier.')
             .addText(text => text
-                .setPlaceholder('og_title')
-                .setValue(this.plugin.settings.titleFieldName)
+                .setPlaceholder('Optional — paste an API key from microlink.io')
+                .setValue(this.plugin.settings.microlinkApiKey)
                 .onChange(async (value) => {
-                    this.plugin.settings.titleFieldName = value || 'og_title';
+                    this.plugin.settings.microlinkApiKey = value;
                     await this.plugin.saveSettings();
                 }));
 
-        // Description field name
-        new Setting(containerEl)
-            .setName('Description Field Name')
-            .setDesc('Field name for the OpenGraph description')
-            .addText(text => text
-                .setPlaceholder('og_description')
-                .setValue(this.plugin.settings.descriptionFieldName)
-                .onChange(async (value) => {
-                    this.plugin.settings.descriptionFieldName = value || 'og_description';
-                    await this.plugin.saveSettings();
-                }));
+        // ============================================================
+        // Provider: Direct Fetch (no settings — informational)
+        // ============================================================
+        const direct = this.createSection('Provider: Direct Fetch');
+        const directIntro = direct.createEl('p', {
+            text: 'Fetches the page HTML directly via Obsidian\'s requestUrl and parses Open Graph / Twitter / <title> meta tags inline. No API key, no rate limits, no third party. Best when the page is server-rendered.',
+        });
+        directIntro.addClass('setting-item-description');
 
-        // Image field name
-        new Setting(containerEl)
-            .setName('Image Field Name')
-            .setDesc('Field name for the OpenGraph image URL')
-            .addText(text => text
-                .setPlaceholder('og_image')
-                .setValue(this.plugin.settings.imageFieldName)
-                .onChange(async (value) => {
-                    this.plugin.settings.imageFieldName = value || 'og_image';
-                    await this.plugin.saveSettings();
-                }));
+        // ============================================================
+        // Field Name Mappings (shared by every fetcher)
+        // ============================================================
+        const fields = this.createSection('Field Name Mappings', { open: false });
 
-        // Favicon field name
-        new Setting(containerEl)
-            .setName('Favicon Field Name')
-            .setDesc('Field name for the website favicon URL')
-            .addText(text => text
-                .setPlaceholder('og_favicon')
-                .setValue((this.plugin.settings as any).faviconFieldName || 'og_favicon')
-                .onChange(async (value) => {
-                    (this.plugin.settings as any).faviconFieldName = value || 'og_favicon';
-                    await this.plugin.saveSettings();
-                }));
+        const fieldsIntro = fields.createEl('p', {
+            text: 'Frontmatter keys written by every fetch command. Defaults follow the og_* convention.',
+        });
+        fieldsIntro.addClass('setting-item-description');
 
-        // Fetch date field name
-        new Setting(containerEl)
-            .setName('Fetch Date Field Name')
-            .setDesc('Field name for the last fetch timestamp')
-            .addText(text => text
-                .setPlaceholder('og_last_fetch')
-                .setValue(this.plugin.settings.fetchDateFieldName)
-                .onChange(async (value) => {
-                    this.plugin.settings.fetchDateFieldName = value || 'og_last_fetch';
-                    await this.plugin.saveSettings();
-                }));
+        const fieldRows: Array<[label: string, desc: string, key: keyof MetafetchSettings, defaultPlaceholder: string]> = [
+            ['Title', 'Open Graph title', 'titleFieldName', 'og_title'],
+            ['Description', 'Open Graph description', 'descriptionFieldName', 'og_description'],
+            ['Image', 'Open Graph image URL', 'imageFieldName', 'og_image'],
+            ['Favicon', 'Site favicon / logo URL', 'faviconFieldName', 'og_favicon'],
+            ['Site Name', 'Open Graph site_name (Microlink: publisher)', 'siteNameFieldName', 'og_site_name'],
+            ['Type', 'Open Graph type (e.g. "article", "website")', 'typeFieldName', 'og_type'],
+            ['Authors', 'Article authors. Always written as a YAML array (one entry or many).', 'authorsFieldName', 'authors'],
+            ['Published Date', 'Article publication date (Microlink: data.date)', 'publishedDateFieldName', 'og_published'],
+            ['Fetch Date', 'Timestamp of the last fetch', 'fetchDateFieldName', 'og_last_fetch'],
+        ];
 
-        // Status message
-        const statusEl = containerEl.createEl('div', { 
-            text: this.plugin.settings.apiKey 
-                ? '✅ API key configured'
-                : '⚠️ No API key configured - OpenGraph fetching will not work'
+        for (const [label, desc, key, placeholder] of fieldRows) {
+            new Setting(fields)
+                .setName(`${label} field`)
+                .setDesc(desc)
+                .addText(text => text
+                    .setPlaceholder(placeholder)
+                    .setValue(this.plugin.settings[key] as string)
+                    .onChange(async (value) => {
+                        // never write an empty key — fall back to the default
+                        (this.plugin.settings[key] as any) = value || placeholder;
+                        await this.plugin.saveSettings();
+                    }));
+        }
+
+        // ============================================================
+        // Status
+        // ============================================================
+        const statusEl = containerEl.createEl('div', {
+            text: this.plugin.settings.apiKey
+                ? 'OpenGraph.io API key configured'
+                : 'OpenGraph.io API key missing — that provider will not work. Microlink (anonymous) and Direct Fetch are unaffected.',
         });
         statusEl.addClass('setting-item-description');
-        
-        // Add warning styling for missing API key
-        if (!this.plugin.settings.apiKey) {
-            statusEl.addClass('setting-item-warning');
-        }
+        if (!this.plugin.settings.apiKey) statusEl.addClass('setting-item-warning');
     }
 }

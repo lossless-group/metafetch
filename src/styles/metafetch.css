@@ -517,3 +517,41 @@
   border: 1px solid var(--text-error) !important;
   margin-top: 8px !important;
 }
+
+/* Collapsible per-provider settings sections */
+.metafetch-settings-section {
+  margin: 12px 0;
+  padding: 8px 12px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+}
+
+.metafetch-settings-section[open] {
+  padding-bottom: 16px;
+}
+
+.metafetch-settings-summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 1.05em;
+  color: var(--text-accent);
+  padding: 4px 0;
+  list-style: none;
+  user-select: none;
+}
+
+.metafetch-settings-summary::-webkit-details-marker {
+  display: none;
+}
+
+.metafetch-settings-summary::before {
+  content: "▸";
+  display: inline-block;
+  margin-right: 8px;
+  transition: transform 0.15s ease;
+}
+
+.metafetch-settings-section[open] > .metafetch-settings-summary::before {
+  transform: rotate(90deg);
+}

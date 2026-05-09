@@ -24,6 +24,8 @@ export interface OpenGraphData {
   url: string;
   type: string;
   site_name: string;
+  authors?: string[];
+  published?: string;
   error?: string;
   date?: string;
   fetchDate?: string;

@@ -24,7 +24,17 @@ export function extractFrontmatter(content: string): Record<string, any> | null 
     if (!line) continue;
     
     if (line.startsWith('- ') && currentArrayProperty) {
-      arrayValues.push(line.substring(2).trim());
+      let item = line.substring(2).trim();
+      const isDoubleQuoted = item.startsWith('"') && item.endsWith('"') && item.length >= 2;
+      const isSingleQuoted = item.startsWith("'") && item.endsWith("'") && item.length >= 2;
+      if (isDoubleQuoted) {
+        item = item.substring(1, item.length - 1)
+          .replace(/\\"/g, '"')
+          .replace(/\\\\/g, '\\');
+      } else if (isSingleQuoted) {
+        item = item.substring(1, item.length - 1);
+      }
+      arrayValues.push(item);
       continue;
     }
     
@@ -54,10 +64,17 @@ export function extractFrontmatter(content: string): Record<string, any> | null 
       } else if (!isNaN(Number(value)) && !value.startsWith('0')) {
         frontmatterObject[key] = value.includes('.') ? parseFloat(value) : parseInt(value);
       } else {
-        const trimmedValue = (value.startsWith('"') && value.endsWith('"')) || 
-                            (value.startsWith("'") && value.endsWith("'")) 
-                          ? value.substring(1, value.length - 1)
-                          : value;
+        const isDoubleQuoted = value.startsWith('"') && value.endsWith('"') && value.length >= 2;
+        const isSingleQuoted = value.startsWith("'") && value.endsWith("'") && value.length >= 2;
+        let trimmedValue = value;
+        if (isDoubleQuoted) {
+          // Unescape \" and \\ to mirror what formatFrontmatter wrote
+          trimmedValue = value.substring(1, value.length - 1)
+            .replace(/\\"/g, '"')
+            .replace(/\\\\/g, '\\');
+        } else if (isSingleQuoted) {
+          trimmedValue = value.substring(1, value.length - 1);
+        }
         frontmatterObject[key] = trimmedValue;
       }
     }
@@ -83,24 +100,27 @@ export function formatFrontmatter(frontmatter: Record<string, any>): string {
       if (value === false) return `${key}: false`;
       if (typeof value === 'number') return `${key}: ${value}`;
       if (Array.isArray(value)) {
-        // Handle arrays properly - don't quote the array itself
         if (value.length === 0) {
           return `${key}: []`;
         }
-        const items = value.map(item => `  - ${item}`).join('\n');
+        // Block-style YAML array with each item double-quoted (and \\ / \"
+        // escaped). Matches the convention used for scalar string values.
+        const items = value.map(item => {
+          const escaped = String(item).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+          return `  - "${escaped}"`;
+        }).join('\n');
         return `${key}:\n${items}`;
       }
-      // Only quote string values that need quoting (contain spaces, special chars, etc.)
+      // Always double-quote string values. URLs (og_image, og_favicon, etc.)
+      // routinely contain ?, =, +, (, ), # and other YAML-unsafe chars; quoting
+      // unconditionally is simpler and safer than enumerating every risky case.
       if (typeof value === 'string') {
-        // Check if the string needs quoting
-        const needsQuoting = /[\s:{}\[\]|>*&!%#`@,]/.test(value) || 
-                            value.startsWith('-') || 
-                            value === '' ||
-                            /^(true|false|null|\d+(\.\d+)?)$/.test(value);
-        return needsQuoting ? `${key}: "${value}"` : `${key}: ${value}`;
+        const escaped = value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+        return `${key}: "${escaped}"`;
       }
       // Fallback for other types
-      return `${key}: "${String(value)}"`;
+      const escapedFallback = String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+      return `${key}: "${escapedFallback}"`;
     })
     .join('\n');
 }

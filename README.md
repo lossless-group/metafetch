@@ -4,6 +4,10 @@
 
 An Obsidian plugin that allows you to fetch Open Graph data from a URL using OpenGraph.io.
 
+## Version 1.3
+- Wider, more elegant modal
+- Additional Microlink API support (Free, requires API key)
+
 ## Why Care?  How we use it...
 
 We manage our site-wide content with Obsidian for ease of use and speed of development. We have a "toolkit" section (and subsections, as well as tag filters) for reviewing applications and web services. To make it more visually compelling, we use Open Graph data to display images and titles in our notes. 
@@ -46,10 +50,12 @@ We use this plugin to fetch Open Graph data from a URL using OpenGraph.io.
 
 3. From the Settings tab, click on "Metafetch" and configure the settings.
 
-_This [Obsidian](https://obsidian.md/) plugin works only for [OpenGraph.io](https://opengraph.io/)_
+_This [Obsidian](https://obsidian.md/) plugin works for
+ - [Microlink](https://microlink.io/)
+ - [OpenGraph.io](https://opengraph.io/)_
 <a href="https://opengraph.io/"><img width="252" height="42" alt="trademark_OpenGraph-io" src="https://github.com/user-attachments/assets/08797db6-8fe7-4ced-a4fe-2ad4df79c26a" /></a>
 
-4. Add your OpenGraph.io API key to the settings.
+4. Get at least a Microlink or OpenGraph.io API key and add it to the settings. If you only have one, only the commands related to the one you add will work.
 
 5. Open the Command Palette with `Command + P` (or `Control + P` on Windows & Linux) and type "Metafetch".
 
@@ -84,9 +90,7 @@ pnpm dev
 		"typescript": "5.8.3"
 	},
 	"dependencies": {
-		"@modelcontextprotocol/sdk": "^1.15.0",
 		"dev": "^0.1.3",
-		"fastify": "^5.4.0",
 		"obsidian": "latest",
 		"zod": "^4.0.0"
 	}
