@@ -1,4 +1,4 @@
-import { Notice, TFile, App } from 'obsidian';
+import { Notice, TFile, App, requestUrl } from 'obsidian';
 import { PluginSettings, OpenGraphData } from '../types/open-graph-service';
 import { extractFrontmatter } from '../utils/yamlFrontmatter';
 
@@ -36,18 +36,25 @@ export class OpenGraphService {
         // Use configurable API endpoint format
         const apiUrl = `${this.settings.apiUrl}/${encodeURIComponent(url)}?app_id=${this.apiKey}`;
         
-        const response = await fetch(apiUrl, {
+        // Use Obsidian's requestUrl (not browser fetch) per marketplace
+        // requirement — bypasses CORS/CSP and threads the request through
+        // Obsidian's electron context. `throw: false` keeps non-2xx from
+        // throwing so we surface status in the same shape the prior fetch
+        // code expected.
+        const response = await requestUrl({
+          url: apiUrl,
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
           },
+          throw: false,
         });
 
-        if (!response.ok) {
+        if (response.status < 200 || response.status >= 300) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        const data = await response.json();
+        const data = response.json;
         
         // Validate response structure - check for any available data source
         if (!data.hybridGraph && !data.openGraph && !data.htmlInferred) {
@@ -141,20 +148,23 @@ export class OpenGraphService {
     }
 
     try {
-      const response = await fetch(`${this.baseUrl}/v1/screenshot`, {
+      // Obsidian's requestUrl over native fetch (marketplace requirement).
+      const response = await requestUrl({
+        url: `${this.baseUrl}/v1/screenshot`,
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${this.apiKey}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ url }),
+        throw: false,
       });
 
-      if (!response.ok) {
+      if (response.status < 200 || response.status >= 300) {
         throw new Error(`Screenshot fetch failed: ${response.status}`);
       }
 
-      const data = await response.json();
+      const data = response.json;
       return data.url;
     } catch (error: unknown) {
       console.error('Screenshot fetch error:', error);
