@@ -4,7 +4,7 @@ import { DirectoryScanner, FileInfo } from '../services/directoryScanner';
 import { PluginSettings } from '../types/open-graph-service';
 import { BatchOptions, BatchProgress, ProcessingResult } from '../types/batch-processing';
 import { extractFrontmatter, formatFrontmatter } from '../utils/yamlFrontmatter';
-import Typed from 'typed.js';
+import { Typewriter } from '../utils/typewriter';
 
 // Type helper for DOM elements
 type ObsidianHTMLElement = HTMLElement & {
@@ -47,7 +47,7 @@ export class BatchMetafetchModal extends Modal {
   private animationFrameId: number | null = null;
   private progressIntervalId: number | null = null;
   private loadingMessageIntervalId: number | null = null;
-  private typedInstance: Typed | null = null;
+  private typedInstance: Typewriter | null = null;
 
   constructor(app: App, plugin: MetafetchPlugin) {
     super(app);
@@ -146,26 +146,15 @@ export class BatchMetafetchModal extends Modal {
     this.statusEl.empty();
     const typingElement = this.statusEl.createEl('span', { cls: 'typing-element' });
     
-    // Initialize typed.js with the loading messages
-    this.typedInstance = new Typed(typingElement, {
+    // Cycle the loading messages with the in-repo typewriter animation
+    this.typedInstance = new Typewriter(typingElement, {
       strings: this.loadingMessages,
       typeSpeed: 25,
       backSpeed: 30,
       backDelay: 1000,
       loop: true,
-      showCursor: true,
       cursorChar: '|',
-      autoInsertCss: false,
-      smartBackspace: true,
-      fadeOut: false,
-      fadeOutClass: 'typed-fade-out',
-      fadeOutDelay: 500,
-      onStringTyped: () => {
-        // Optional callback when a string is fully typed
-      },
-      onReset: () => {
-        // Optional callback when typing is reset
-      }
+      smartBackspace: true
     });
   }
 
