@@ -1,4 +1,4 @@
-import { PluginSettingTab } from 'obsidian';
+import type { PluginSettingTab } from 'obsidian';
 
 export interface PluginSettings {
   apiKey: string;

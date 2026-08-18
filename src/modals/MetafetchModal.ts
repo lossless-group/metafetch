@@ -1,6 +1,7 @@
-import { Modal, App } from 'obsidian';
+import type { App } from 'obsidian';
+import { Modal } from 'obsidian';
 import { OpenGraphService, OpenGraphServiceError } from '../services/openGraphService';
-import { PluginSettings, OpenGraphData } from '../types/open-graph-service';
+import type { PluginSettings, OpenGraphData } from '../types/open-graph-service';
 import { extractFrontmatter, formatFrontmatter } from '../utils/yamlFrontmatter';
 import { Typewriter } from '../utils/typewriter';
 
@@ -251,8 +252,10 @@ export class MetafetchModal extends Modal {
       // Format and update frontmatter
       const newFrontmatter = formatFrontmatter(frontmatterObject);
       
-      // Replace or add frontmatter
-      const newContent = content.replace(/---\n(.*?)\n---/s, `---\n${newFrontmatter}\n---`);
+      // Replace or add frontmatter. The `^` anchor matters: unanchored, this
+      // matched a `---` thematic break in the BODY of a note that had no
+      // frontmatter, mangling the body and then prepending a block on top.
+      const newContent = content.replace(/^---\n((?:.|\n)*?)\n---/, `---\n${newFrontmatter}\n---`);
       const finalContent = newContent.startsWith('---') ? newContent : `---\n${newFrontmatter}\n---\n${content}`;
       
       await this.app.vault.modify(file, finalContent);

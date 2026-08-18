@@ -1,4 +1,10 @@
-import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile } from 'obsidian';
+// The top-level import is load-bearing: it makes this file a MODULE, which is
+// what turns `declare module 'obsidian'` below into an *augmentation* of the
+// real types. Without it, the block would be an ambient module declaration that
+// REPLACES Obsidian's types wholesale. The other names this used to import
+// (App, Editor, Notice, …) were dead — inside the augmentation block those
+// identifiers already resolve to the module's own declarations.
+import type { MarkdownView } from 'obsidian';
 
 declare module 'obsidian' {
   interface App {
@@ -62,7 +68,6 @@ declare module 'obsidian' {
   }
 
   interface Setting {
-    constructor(containerEl: HTMLElement);
     setName(name: string): this;
     setDesc(desc: string): this;
     setPlaceholder(placeholder: string): this;
@@ -71,10 +76,6 @@ declare module 'obsidian' {
     addText(callback: (text: Setting) => void): this;
     addSlider(callback: (slider: Setting) => void): this;
     setLimits(min: number, max: number, step: number): this;
-  }
-
-  interface Notice {
-    constructor(message: string, duration?: number);
   }
 
   interface HTMLElement extends globalThis.HTMLElement {

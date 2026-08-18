@@ -1,5 +1,6 @@
-import { Notice, TFile, App, requestUrl } from 'obsidian';
-import { PluginSettings, OpenGraphData } from '../types/open-graph-service';
+import type { TFile, App } from 'obsidian';
+import { Notice, requestUrl } from 'obsidian';
+import type { PluginSettings, OpenGraphData } from '../types/open-graph-service';
 import { extractFrontmatter } from '../utils/yamlFrontmatter';
 
 export class OpenGraphServiceError extends Error {

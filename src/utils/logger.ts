@@ -1,5 +1,6 @@
 import { Notice } from 'obsidian';
-import { TFile, Vault } from 'obsidian';
+import type { Vault } from 'obsidian';
+import { TFile } from 'obsidian';
 
 interface LogEntry {
   timestamp: string;
@@ -42,7 +43,7 @@ export class FileLogger {
         const content = await this.vault.read(file);
         this.logEntries = JSON.parse(content);
       }
-    } catch (error) {
+    } catch {
       // File doesn't exist or is corrupted, start with empty logs
       this.logEntries = [];
     }

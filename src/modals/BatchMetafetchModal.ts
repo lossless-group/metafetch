@@ -1,8 +1,10 @@
-import { Modal, App, TFile } from 'obsidian';
+import type { App } from 'obsidian';
+import { Modal, TFile } from 'obsidian';
 import { OpenGraphService, OpenGraphServiceError } from '../services/openGraphService';
-import { DirectoryScanner, FileInfo } from '../services/directoryScanner';
-import { PluginSettings } from '../types/open-graph-service';
-import { BatchOptions, BatchProgress, ProcessingResult } from '../types/batch-processing';
+import type { FileInfo } from '../services/directoryScanner';
+import { DirectoryScanner } from '../services/directoryScanner';
+import type { PluginSettings } from '../types/open-graph-service';
+import type { BatchOptions, BatchProgress, ProcessingResult } from '../types/batch-processing';
 import { extractFrontmatter, formatFrontmatter } from '../utils/yamlFrontmatter';
 import { Typewriter } from '../utils/typewriter';
 
@@ -625,7 +627,7 @@ export class BatchMetafetchModal extends Modal {
       await this.completeProgress();
       
       this.finishProcessing();
-    } catch (error) {
+    } catch {
       // Stop loading messages on error
       this.stopLoadingMessages();
       this.finishProcessing();

@@ -1,5 +1,6 @@
-import { PluginSettingTab, Setting, App } from 'obsidian';
-import MetafetchPlugin from '../../main';
+import type { App } from 'obsidian';
+import { PluginSettingTab, Setting } from 'obsidian';
+import type MetafetchPlugin from '../../main';
 
 export class MetafetchPluginSettingsTab extends PluginSettingTab {
     plugin: MetafetchPlugin;

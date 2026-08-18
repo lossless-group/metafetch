@@ -1,5 +1,5 @@
 import { requestUrl } from 'obsidian';
-import { OpenGraphData } from '../types/open-graph-service';
+import type { OpenGraphData } from '../types/open-graph-service';
 
 export class MicrolinkFetchError extends Error {
   constructor(message: string, public readonly code: string) {

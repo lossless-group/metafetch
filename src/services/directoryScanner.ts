@@ -1,5 +1,5 @@
-import { App, TFile, Vault } from 'obsidian';
-import { PluginSettings } from '../types/open-graph-service';
+import type { App, TFile, Vault } from 'obsidian';
+import type { PluginSettings } from '../types/open-graph-service';
 import { extractFrontmatter } from '../utils/yamlFrontmatter';
 
 export interface FileInfo {

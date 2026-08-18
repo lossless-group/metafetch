@@ -1,6 +1,7 @@
 // metafetch/src/settings/settings.ts
-import { App, PluginSettingTab, Setting } from 'obsidian';
-import MetafetchPlugin from '../../main';
+import type { App } from 'obsidian';
+import { PluginSettingTab, Setting } from 'obsidian';
+import type MetafetchPlugin from '../../main';
 
 export interface MetafetchSettings {
     // Provider: OpenGraph.io

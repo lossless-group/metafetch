@@ -1,14 +1,23 @@
-import { Notice, Plugin, Editor, TFile } from 'obsidian';
+import type { Editor } from 'obsidian';
+import { Notice, Plugin, TFile } from 'obsidian';
 import { MetafetchModal } from './src/modals/MetafetchModal';
 import { BatchMetafetchModal } from './src/modals/BatchMetafetchModal';
 import { MetafetchSettingTab, DEFAULT_SETTINGS, type MetafetchSettings } from './src/settings/settings';
 import { fetchDirectOpenGraph } from './src/services/directFetchService';
 import { fetchMicrolinkOpenGraph } from './src/services/microlinkFetchService';
-import { OpenGraphData } from './src/types/open-graph-service';
+import type { OpenGraphData } from './src/types/open-graph-service';
 import { extractFrontmatter, formatFrontmatter } from './src/utils/yamlFrontmatter';
+import { collectFrontmatterUrls } from './src/utils/frontmatterUrls';
+import { SelectUrlModal } from './src/modals/SelectUrlModal';
+import type { FetchProvider } from './src/modals/SelectUrlModal';
 
 export default class MetafetchPlugin extends Plugin {
-    settings!: MetafetchSettings;
+    // Obsidian 1.13.0 added `settings?: unknown` to the Plugin base class and
+    // asks subclasses to narrow it to a concrete type. `declare` does exactly
+    // that — a type-only refinement of the inherited property. Without it TS
+    // emits a real field declaration that would clobber the base with
+    // `undefined` at construction.
+    declare settings: MetafetchSettings;
 
     async onload(): Promise<void> {
         await this.loadSettings();
@@ -74,9 +83,49 @@ export default class MetafetchPlugin extends Plugin {
                 void this.runFetchScript('microlink');
             }
         });
+
+        // Command: pick which frontmatter URL to fetch. Source notes key their
+        // URL under whatever property fits the source — arxiv, ssrn, nature,
+        // techcrunch — and often carry several at once, so we show them all
+        // rather than guessing a precedence order.
+        this.addCommand({
+            id: 'fetch-from-frontmatter-url',
+            name: 'Fetch from a frontmatter URL…',
+            editorCallback: (_editor: Editor) => {
+                void this.chooseFrontmatterUrl();
+            }
+        });
     }
 
-    private async runFetchScript(provider: 'direct' | 'microlink'): Promise<void> {
+    /**
+     * Opens the URL picker for the active note. Image-valued fields are kept
+     * out of the list so metafetch never offers to fetch its own output.
+     */
+    private async chooseFrontmatterUrl(): Promise<void> {
+        const file = this.app.workspace.getActiveFile();
+        if (!file || !(file instanceof TFile)) {
+            new Notice('Metafetch: no active file');
+            return;
+        }
+
+        const content = await this.app.vault.read(file);
+        const fm = extractFrontmatter(content);
+        const urls = collectFrontmatterUrls(fm, [
+            this.settings.imageFieldName,
+            this.settings.faviconFieldName,
+        ]);
+
+        new SelectUrlModal(this.app, urls, (url, provider) => {
+            void this.runFetchScript(provider, url);
+        }).open();
+    }
+
+    /**
+     * @param explicitUrl When given (from the URL picker), fetch this instead
+     *                    of the note's `url` property. Without it the two
+     *                    single-key commands behave exactly as before.
+     */
+    private async runFetchScript(provider: FetchProvider, explicitUrl?: string): Promise<void> {
         const file = this.app.workspace.getActiveFile();
         if (!file || !(file instanceof TFile)) {
             new Notice('Metafetch: no active file');
@@ -85,9 +134,9 @@ export default class MetafetchPlugin extends Plugin {
 
         const content = await this.app.vault.read(file);
         const fm = extractFrontmatter(content) ?? {};
-        const url = typeof fm.url === 'string' ? fm.url : null;
+        const url = explicitUrl ?? (typeof fm.url === 'string' ? fm.url : null);
         if (!url) {
-            new Notice('Metafetch: no `url` field in frontmatter');
+            new Notice('Metafetch: no `url` field in frontmatter — try "Fetch from a frontmatter URL…" to pick another property');
             return;
         }
 
@@ -101,7 +150,10 @@ export default class MetafetchPlugin extends Plugin {
             const s = this.settings;
 
             const next: Record<string, any> = { ...fm };
-            next.url = url;
+            // Only claim the `url` key when the URL came from it (or nothing
+            // holds it yet). Fetching the `arxiv:` property shouldn't quietly
+            // mint a duplicate `url:` the note never had.
+            if (!explicitUrl || !fm.url) next.url = url;
             next[s.titleFieldName] = data.title;
             next[s.descriptionFieldName] = data.description;
             next[s.imageFieldName] = data.image;
