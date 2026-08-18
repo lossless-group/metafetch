@@ -7,10 +7,11 @@ name: Release plugin
 # installing can verify provenance with `gh attestation verify <file>
 # --repo lossless-group/metafetch`.
 #
-# Release notes: if release-notes/<tag>.md exists in the repo at the tagged
-# commit, it's used verbatim as the release body. Otherwise the workflow
-# falls back to GitHub's --generate-notes. The convention going forward is
-# to author the marketing-shape notes in release-notes/<version>.md before
+# Release notes: if changelog/releases/<tag>.md exists in the repo at the
+# tagged commit, it's used verbatim as the release body (falling back to the
+# legacy release-notes/<tag>.md path, then to GitHub's --generate-notes).
+# The convention going forward is to author the marketing-shape notes in
+# changelog/releases/<version>.md before
 # tagging (per content-farm/context-v/skills/changelog-conventions/SKILL.md
 # "These are marketing artifacts" section — every release page is a
 # four-audience marketing surface, not a commit-message recap).
@@ -61,14 +62,27 @@ jobs:
       - name: Pick release-notes source
         id: notes
         run: |
-          NOTES_FILE="release-notes/${GITHUB_REF_NAME}.md"
-          if [ -f "$NOTES_FILE" ]; then
+          # changelog/releases/<tag>.md is the canonical location, per the
+          # changelog-conventions skill. release-notes/<tag>.md is the legacy
+          # path this repo used through 0.1.7 — kept as a fallback so building
+          # from an older tag still finds its notes at that commit.
+          CANONICAL="changelog/releases/${GITHUB_REF_NAME}.md"
+          LEGACY="release-notes/${GITHUB_REF_NAME}.md"
+          if [ -f "$CANONICAL" ]; then
+            NOTES_FILE="$CANONICAL"
+          elif [ -f "$LEGACY" ]; then
+            NOTES_FILE="$LEGACY"
+          else
+            NOTES_FILE=""
+          fi
+
+          if [ -n "$NOTES_FILE" ]; then
             echo "found=true" >> "$GITHUB_OUTPUT"
             echo "path=$NOTES_FILE" >> "$GITHUB_OUTPUT"
-            echo "Using release-notes/${GITHUB_REF_NAME}.md as release body"
+            echo "Using $NOTES_FILE as release body"
           else
             echo "found=false" >> "$GITHUB_OUTPUT"
-            echo "No release-notes/${GITHUB_REF_NAME}.md found — falling back to --generate-notes"
+            echo "No notes at $CANONICAL or $LEGACY — falling back to --generate-notes"
           fi
 
       - name: Create release
