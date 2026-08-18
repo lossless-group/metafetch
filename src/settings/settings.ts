@@ -26,6 +26,11 @@ export interface MetafetchSettings {
     typeFieldName: string;
     authorsFieldName: string;
     publishedDateFieldName: string;
+
+    /** Mint a vault-unique identity code on fetched notes. Off by default. */
+    stampHexCode: boolean;
+    hexCodeFieldName: string;
+    hexCodeLength: number;
 }
 
 export const DEFAULT_SETTINGS: MetafetchSettings = {
@@ -48,6 +53,12 @@ export const DEFAULT_SETTINGS: MetafetchSettings = {
     typeFieldName: 'og_type',
     authorsFieldName: 'authors',
     publishedDateFieldName: 'og_published',
+
+    // Opt-in: this writes a property the note didn't ask for, and it's an
+    // identity commitment rather than fetched metadata.
+    stampHexCode: false,
+    hexCodeFieldName: 'hex_code',
+    hexCodeLength: 6,
 };
 
 export class MetafetchSettingTab extends PluginSettingTab {
@@ -212,6 +223,50 @@ export class MetafetchSettingTab extends PluginSettingTab {
                         await this.plugin.saveSettings();
                     }));
         }
+
+        // ============================================================
+        // Vault identity code
+        // ============================================================
+        const identity = this.createSection('Vault Identity Code', { open: false });
+        const identityIntro = identity.createEl('p', {
+            text: 'Mint a short, vault-unique code on each fetched note so it can be referenced from anywhere by something stabler than its filename. Written once — an existing code is never overwritten or regenerated.',
+        });
+        identityIntro.addClass('setting-item-description');
+
+        new Setting(identity)
+            .setName('Stamp an identity code')
+            .setDesc('Off by default: this writes a property the note did not ask for.')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.stampHexCode)
+                .onChange(async (value) => {
+                    this.plugin.settings.stampHexCode = value;
+                    await this.plugin.saveSettings();
+                }));
+
+        new Setting(identity)
+            .setName('Identity code field')
+            .setDesc('Frontmatter key that holds the code.')
+            .addText(text => text
+                .setPlaceholder('hex_code')
+                .setValue(this.plugin.settings.hexCodeFieldName)
+                .onChange(async (value) => {
+                    this.plugin.settings.hexCodeFieldName = value || 'hex_code';
+                    await this.plugin.saveSettings();
+                }));
+
+        new Setting(identity)
+            .setName('Code length')
+            .setDesc('Characters drawn from a-z0-9 — 36 possibilities each, not 16. Despite the "hex" name these are not hexadecimal: the wider alphabet costs the same on disk and makes collisions far less likely (6 chars gives 2.18 billion combinations, versus 16.7 million for true hex).')
+            // No .setDynamicTooltip(): the repo's obsidian.d.ts augmentation
+            // types addSlider's argument as Setting rather than SliderComponent.
+            // Worth fixing with that shim, not around it.
+            .addSlider(slider => slider
+                .setLimits(4, 12, 1)
+                .setValue(this.plugin.settings.hexCodeLength)
+                .onChange(async (value: number) => {
+                    this.plugin.settings.hexCodeLength = value;
+                    await this.plugin.saveSettings();
+                }));
 
         // ============================================================
         // Status

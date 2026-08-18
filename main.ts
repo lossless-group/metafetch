@@ -10,6 +10,7 @@ import { extractFrontmatter, formatFrontmatter } from './src/utils/yamlFrontmatt
 import { collectFrontmatterUrls } from './src/utils/frontmatterUrls';
 import { SelectUrlModal } from './src/modals/SelectUrlModal';
 import type { FetchProvider } from './src/modals/SelectUrlModal';
+import { stampIdentityCode } from './src/utils/hexCode';
 
 export default class MetafetchPlugin extends Plugin {
     // Obsidian 1.13.0 added `settings?: unknown` to the Plugin base class and
@@ -163,6 +164,7 @@ export default class MetafetchPlugin extends Plugin {
             if (data.authors && data.authors.length > 0) next[s.authorsFieldName] = data.authors;
             if (data.published) next[s.publishedDateFieldName] = data.published;
             next[s.fetchDateFieldName] = new Date().toISOString();
+            stampIdentityCode(this.app, next, s);
             delete next.og_error;
             delete next.og_error_timestamp;
             delete next.og_error_code;

@@ -6,6 +6,7 @@ import { DirectoryScanner } from '../services/directoryScanner';
 import type { PluginSettings } from '../types/open-graph-service';
 import type { BatchOptions, BatchProgress, ProcessingResult } from '../types/batch-processing';
 import { extractFrontmatter, formatFrontmatter } from '../utils/yamlFrontmatter';
+import { stampIdentityCode } from '../utils/hexCode';
 import { Typewriter } from '../utils/typewriter';
 
 // Type helper for DOM elements
@@ -50,6 +51,8 @@ export class BatchMetafetchModal extends Modal {
   private progressIntervalId: number | null = null;
   private loadingMessageIntervalId: number | null = null;
   private typedInstance: Typewriter | null = null;
+  /** Identity codes minted during this batch, ahead of the metadata cache. */
+  private readonly mintedHexCodes: Set<string> = new Set();
 
   constructor(app: App, plugin: MetafetchPlugin) {
     super(app);
@@ -706,6 +709,11 @@ export class BatchMetafetchModal extends Modal {
     if (this.options.updateFetchDate) {
       frontmatter[this.settings.fetchDateFieldName] = new Date().toISOString();
     }
+
+    // Mint a vault identity code if the user opted in. The run-scoped set
+    // covers the window where a code written moments ago hasn't reached
+    // Obsidian's metadata cache yet.
+    stampIdentityCode(this.app, frontmatter, this.settings, this.mintedHexCodes);
 
     // Clear any previous errors if this is a successful operation
     if (frontmatter.og_error) {

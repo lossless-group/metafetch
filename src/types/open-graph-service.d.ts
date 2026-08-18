@@ -14,6 +14,10 @@ export interface PluginSettings {
   imageFieldName: string;
   faviconFieldName: string;
   fetchDateFieldName: string;
+  // Vault identity code — see src/utils/hexCode.ts
+  stampHexCode: boolean;
+  hexCodeFieldName: string;
+  hexCodeLength: number;
 }
 
 export interface OpenGraphData {

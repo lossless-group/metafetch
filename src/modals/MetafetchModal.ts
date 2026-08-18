@@ -3,6 +3,7 @@ import { Modal } from 'obsidian';
 import { OpenGraphService, OpenGraphServiceError } from '../services/openGraphService';
 import type { PluginSettings, OpenGraphData } from '../types/open-graph-service';
 import { extractFrontmatter, formatFrontmatter } from '../utils/yamlFrontmatter';
+import { stampIdentityCode } from '../utils/hexCode';
 import { Typewriter } from '../utils/typewriter';
 
 interface ModalOptions {
@@ -482,6 +483,9 @@ export class MetafetchModal extends Modal {
       if (this.options.updateFetchDate) {
         frontmatterObject[this.settings.fetchDateFieldName] = new Date().toISOString();
       }
+
+      // Mint a vault identity code if the user opted in.
+      stampIdentityCode(this.app, frontmatterObject, this.settings);
 
       // Clear any previous errors if this is a successful operation
       if (frontmatterObject.og_error) {
