@@ -75,15 +75,24 @@ const crowded = new Set(sample);
 const fresh = mintUniqueHexCode(crowded, 6);
 check('mints a code not already in the set', !crowded.has(fresh));
 
-// Exhaust a tiny space so the uniqueness path is genuinely exercised: with
-// length 1 there are only 36 possibilities, and we block 35 of them.
-const almostAll = new Set('abcdefghijklmnopqrstuvwxyz0123456789'.slice(0, 35).split(''));
-const onlyOneLeft = mintUniqueHexCode(almostAll, 1);
-check('finds the one remaining code in a nearly-exhausted space',
-  onlyOneLeft === '9', `got ${JSON.stringify(onlyOneLeft)}`);
+// Squeeze a tiny space so the uniqueness path is genuinely exercised: with
+// length 1 there are only 36 possibilities, and we block half of them.
+//
+// Deliberately half and not 35-of-36. Minting retries a bounded number of
+// times before widening the code by a character, so blocking all but one slot
+// makes the outcome depend on retry luck — the widen path legitimately fires
+// about a quarter of the time. Half leaves the odds of a spurious failure at
+// roughly 2^-50, while still proving the real property: a taken code is never
+// handed out.
+const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789'.split('');
+const halfTaken = new Set(alphabet.slice(0, 18));
+const fromSqueezedSpace = mintUniqueHexCode(halfTaken, 1);
+check('never returns a code that is already taken',
+  !halfTaken.has(fromSqueezedSpace) && alphabet.includes(fromSqueezedSpace),
+  `got ${JSON.stringify(fromSqueezedSpace)}`);
 
 // When the space really is exhausted it widens rather than spinning forever.
-const allTaken = new Set('abcdefghijklmnopqrstuvwxyz0123456789'.split(''));
+const allTaken = new Set(alphabet);
 const widened = mintUniqueHexCode(allTaken, 1);
 check('widens by one character when the space is exhausted', widened.length === 2);
 
