@@ -101,7 +101,7 @@ function splitFlowSequence(inner: string): string[] {
  * @param content The markdown content
  * @returns The extracted frontmatter as an object, or null if no frontmatter is found
  */
-export function extractFrontmatter(content: string): Record<string, any> | null {
+export function extractFrontmatter(content: string): Record<string, unknown> | null {
   if (!content) return null;
 
   const frontmatterRegex = /^---\n((?:.|\n)*?)\n---/;
@@ -109,11 +109,11 @@ export function extractFrontmatter(content: string): Record<string, any> | null 
   if (!match || !match[1]) return null;
 
   const frontmatterContent = match[1].trim();
-  const frontmatterObject: Record<string, any> = {};
+  const frontmatterObject: Record<string, unknown> = {};
   
   const lines = frontmatterContent.split('\n');
   let currentArrayProperty: string | null = null;
-  let arrayValues: any[] = [];
+  let arrayValues: unknown[] = [];
   
   for (let line of lines) {
     line = line.trim();
@@ -174,7 +174,7 @@ export function extractFrontmatter(content: string): Record<string, any> | null 
  * @param frontmatter The frontmatter object
  * @returns Formatted YAML string
  */
-export function formatFrontmatter(frontmatter: Record<string, any>): string {
+export function formatFrontmatter(frontmatter: Record<string, unknown>): string {
   return Object.entries(frontmatter)
     .map(([key, value]) => {
       if (value === null) return `${key}: null`;
@@ -206,7 +206,12 @@ export function formatFrontmatter(frontmatter: Record<string, any>): string {
         return `${key}: "${escaped}"`;
       }
       // Fallback for other types
-      const escapedFallback = String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+      // Objects stringify to '[object Object]' exactly as String() always did.
+      const fallback =
+        typeof value === 'bigint' || typeof value === 'symbol' ? value.toString()
+        : value === undefined ? 'undefined'
+        : '[object Object]';
+      const escapedFallback = fallback.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
       return `${key}: "${escapedFallback}"`;
     })
     .join('\n');

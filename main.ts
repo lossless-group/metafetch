@@ -26,7 +26,7 @@ export default class MetafetchPlugin extends Plugin {
         // Add ribbon icon
         const ribbonIconEl = this.addRibbonIcon(
             'external-link',
-            'Fetch Open Graph Data',
+            'Fetch Open Graph data',
             () => {
                 new Notice('Metafetch is ready!');
             }
@@ -53,7 +53,7 @@ export default class MetafetchPlugin extends Plugin {
         // Command to fetch OpenGraph data for current file
         this.addCommand({
             id: 'fetch-opengraph-data',
-            name: 'Fetch Open Graph Data for Current File',
+            name: 'Fetch Open Graph data for current file',
             editorCallback: (_editor: Editor) => {
                 new MetafetchModal(this.app, this).open();
             }
@@ -62,7 +62,7 @@ export default class MetafetchPlugin extends Plugin {
         // Command to batch process multiple files for OpenGraph data
         this.addCommand({
             id: 'batch-fetch-opengraph-data',
-            name: 'Batch Fetch Open Graph Data',
+            name: 'Batch fetch Open Graph data',
             callback: () => {
                 new BatchMetafetchModal(this.app, this).open();
             }
@@ -71,7 +71,7 @@ export default class MetafetchPlugin extends Plugin {
         // Command: parse Open Graph meta tags directly from page HTML, no third-party API
         this.addCommand({
             id: 'direct-fetch-from-script',
-            name: 'Direct Fetch from Script',
+            name: 'Direct fetch from script',
             editorCallback: (_editor: Editor) => {
                 void this.runFetchScript('direct');
             }
@@ -151,7 +151,7 @@ export default class MetafetchPlugin extends Plugin {
                     : await fetchDirectOpenGraph(url);
             const s = this.settings;
 
-            const next: Record<string, any> = { ...fm };
+            const next: Record<string, unknown> = { ...fm };
             // Only claim the `url` key when the URL came from it (or nothing
             // holds it yet). Fetching the `arxiv:` property shouldn't quietly
             // mint a duplicate `url:` the note never had.
@@ -191,7 +191,8 @@ export default class MetafetchPlugin extends Plugin {
         }
     }
 
-    async onunload(): Promise<void> {
-        // Clean up any resources if needed
+    onunload(): void {
+        // Nothing to clean up: commands, the ribbon icon, and the settings tab
+        // are registered through the Plugin API, which unloads them.
     }
 }

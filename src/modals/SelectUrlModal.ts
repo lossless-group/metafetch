@@ -39,7 +39,7 @@ export class SelectUrlModal extends Modal {
 
     if (this.urls.length === 0) {
       contentEl.createEl('p', {
-        text: 'No http(s) URLs found in this note\'s frontmatter. Add one under any property name — url, arxiv, doi, techcrunch — and run this again.',
+        text: 'No http(s) URL found in this note\'s frontmatter. Add one under any property name, such as arxiv, doi, or techcrunch, and run this again.',
       });
       new Setting(contentEl).addButton((btn) =>
         btn.setButtonText('Close').onClick(() => this.close())
@@ -49,7 +49,7 @@ export class SelectUrlModal extends Modal {
 
     new Setting(contentEl)
       .setName('Provider')
-      .setDesc('Direct parses the page HTML itself. Microlink uses their API (free tier ~50/day).')
+      .setDesc('Direct parses the page itself. Microlink uses their API (free tier about 50 per day).')
       .addDropdown((dropdown) =>
         dropdown
           .addOption('direct', 'Direct fetch')

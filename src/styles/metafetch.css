@@ -517,3 +517,15 @@
   border: 1px solid var(--text-error) !important;
   margin-top: 8px !important;
 }
+
+/* Batch modal button row (replaces former inline styles) */
+.metafetch-button-row {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 1em;
+}
+
+.metafetch-button-wrapper {
+  display: flex;
+  gap: 8px;
+}

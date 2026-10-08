@@ -3,7 +3,7 @@ import { Modal, TFile } from 'obsidian';
 import { OpenGraphService, OpenGraphServiceError } from '../services/openGraphService';
 import type { FileInfo } from '../services/directoryScanner';
 import { DirectoryScanner } from '../services/directoryScanner';
-import type { PluginSettings } from '../types/open-graph-service';
+import type { PluginSettings, OpenGraphData } from '../types/open-graph-service';
 import type { BatchOptions, BatchProgress, ProcessingResult } from '../types/batch-processing';
 import { extractFrontmatter, formatFrontmatter } from '../utils/yamlFrontmatter';
 import { stampIdentityCode } from '../utils/hexCode';
@@ -105,12 +105,12 @@ export class BatchMetafetchModal extends Modal {
     this.clearEventListeners();
     // Cancel any ongoing animation
     if (this.animationFrameId) {
-      cancelAnimationFrame(this.animationFrameId);
+      window.cancelAnimationFrame(this.animationFrameId);
       this.animationFrameId = null;
     }
     // Clear any ongoing progress interval
     if (this.progressIntervalId) {
-      clearInterval(this.progressIntervalId);
+      window.clearInterval(this.progressIntervalId);
       this.progressIntervalId = null;
     }
     // Clear any ongoing loading message interval
@@ -149,7 +149,7 @@ export class BatchMetafetchModal extends Modal {
     
     // Create a span element for the typing animation
     this.statusEl.empty();
-    const typingElement = this.statusEl.createEl('span', { cls: 'typing-element' });
+    const typingElement = this.statusEl.createSpan({ cls: 'typing-element' });
     
     // Cycle the loading messages with the in-repo typewriter animation
     this.typedInstance = new Typewriter(typingElement, {
@@ -169,7 +169,7 @@ export class BatchMetafetchModal extends Modal {
   private stopLoadingMessages(): void {
     // Clear any ongoing interval
     if (this.loadingMessageIntervalId) {
-      clearInterval(this.loadingMessageIntervalId);
+      window.clearInterval(this.loadingMessageIntervalId);
       this.loadingMessageIntervalId = null;
     }
     
@@ -205,7 +205,7 @@ export class BatchMetafetchModal extends Modal {
         this.progressBar!.value = currentValue;
         
         if (progress < 1) {
-          this.animationFrameId = requestAnimationFrame(animate);
+          this.animationFrameId = window.requestAnimationFrame(animate);
         } else {
           this.progressBar!.value = targetValue;
           this.animationFrameId = null;
@@ -213,7 +213,7 @@ export class BatchMetafetchModal extends Modal {
         }
       };
 
-      this.animationFrameId = requestAnimationFrame(animate);
+      this.animationFrameId = window.requestAnimationFrame(animate);
     });
   }
 
@@ -227,16 +227,16 @@ export class BatchMetafetchModal extends Modal {
     const increment = 10;
     const interval = 2000; // 2 seconds
 
-    const progressInterval = setInterval(() => {
+    const progressInterval = window.setInterval(() => {
       if (!this.progress.isProcessing || currentProgress >= 90) {
-        clearInterval(progressInterval);
+        window.clearInterval(progressInterval);
         return;
       }
 
       currentProgress += increment;
       if (currentProgress > 90) currentProgress = 90;
       
-      this.animateProgressTo(currentProgress, 300); // Quick 300ms animation for each increment
+      void this.animateProgressTo(currentProgress, 300); // Quick 300ms animation for each increment
     }, interval);
 
     // Store the interval ID for cleanup
@@ -249,7 +249,7 @@ export class BatchMetafetchModal extends Modal {
   private completeProgress(): Promise<void> {
     // Clear any ongoing incremental progress
     if (this.progressIntervalId) {
-      clearInterval(this.progressIntervalId);
+      window.clearInterval(this.progressIntervalId);
       this.progressIntervalId = null;
     }
     
@@ -289,7 +289,7 @@ export class BatchMetafetchModal extends Modal {
   private async createHeader(contentEl: ObsidianHTMLElement): Promise<void> {
     const header = contentEl.createDiv('opengraph-header');
     header.createEl('h2', { 
-      text: 'Metafetch — Batch',
+      text: 'Metafetch — batch',
       cls: 'opengraph-title' 
     });
   }
@@ -302,19 +302,19 @@ export class BatchMetafetchModal extends Modal {
     const buttonContainer = section.createDiv('opengraph-button-group');
     
     const refreshButton = buttonContainer.createEl('button', { 
-      text: 'Refresh Scan',
+      text: 'Refresh scan',
       cls: 'mod-cta opengraph-fetch-btn'
     });
     refreshButton.onclick = () => this.scanCurrentDirectory();
     
     const selectAllBtn = buttonContainer.createEl('button', { 
-      text: 'Select All',
+      text: 'Select all',
       cls: 'mod-cta opengraph-fetch-btn'
     });
     selectAllBtn.onclick = () => this.selectAllFiles();
     
     const deselectAllBtn = buttonContainer.createEl('button', { 
-      text: 'Deselect All',
+      text: 'Deselect all',
       cls: 'mod-cta-outline opengraph-cancel-btn'
     });
     deselectAllBtn.onclick = () => this.deselectAllFiles();
@@ -322,7 +322,7 @@ export class BatchMetafetchModal extends Modal {
 
   private async createFileListSection(contentEl: ObsidianHTMLElement): Promise<void> {
     const section = contentEl.createDiv('opengraph-file-section');
-    section.createEl('h3', { text: 'Eligible Files', cls: 'opengraph-subtitle' });
+    section.createEl('h3', { text: 'Eligible files', cls: 'opengraph-subtitle' });
     
     this.fileListEl = section.createDiv('opengraph-file-list');
   }
@@ -331,7 +331,7 @@ export class BatchMetafetchModal extends Modal {
 
   private createOptionsSection(contentEl: ObsidianHTMLElement): void {
     const section = contentEl.createDiv('opengraph-options-section');
-    section.createEl('h3', { text: 'Processing Options', cls: 'opengraph-subtitle' });
+    section.createEl('h3', { text: 'Processing options', cls: 'opengraph-subtitle' });
     
     const optionsTable = section.createEl('table', { cls: 'opengraph-options-table' });
     const optionsGrid = optionsTable.createEl('tbody');
@@ -363,7 +363,7 @@ export class BatchMetafetchModal extends Modal {
         cls: 'opengraph-option-label'
       });
       if (description) {
-        container.createEl('div', {
+        container.createDiv({
           text: description,
           cls: 'opengraph-option-description'
         });
@@ -377,12 +377,12 @@ export class BatchMetafetchModal extends Modal {
 
     // Batch delay slider
     const delayContainer = section.createDiv('batch-delay-container');
-    delayContainer.createEl('label', { text: 'Batch Delay (ms):' });
+    delayContainer.createEl('label', { text: 'Batch delay (ms):' });
     const delaySlider = delayContainer.createEl('input', { type: 'range' });
     delaySlider.min = '100';
     delaySlider.max = '5000';
     delaySlider.value = this.options.batchDelay.toString();
-    const delayValue = delayContainer.createEl('span', { text: this.options.batchDelay.toString() });
+    const delayValue = delayContainer.createSpan({ text: this.options.batchDelay.toString() });
     
     delaySlider.oninput = () => {
       this.options.batchDelay = parseInt(delaySlider.value);
@@ -406,16 +406,13 @@ export class BatchMetafetchModal extends Modal {
 
   private createButtonSection(contentEl: ObsidianHTMLElement): void {
     const section = contentEl.createDiv('opengraph-button-container');
-    section.style.display = 'flex';
-    section.style.justifyContent = 'space-between';
-    section.style.marginTop = '1em';
+    section.addClass('metafetch-button-row');
     
     const buttonWrapper = section.createDiv('opengraph-button-wrapper');
-    buttonWrapper.style.display = 'flex';
-    buttonWrapper.style.gap = '8px';
+    buttonWrapper.addClass('metafetch-button-wrapper');
     
     this.processButton = buttonWrapper.createEl('button', {
-      text: 'Start Processing',
+      text: 'Start processing',
       cls: 'mod-cta opengraph-fetch-btn'
     });
     this.processButton.onclick = () => this.startBatchProcessing();
@@ -461,7 +458,7 @@ export class BatchMetafetchModal extends Modal {
     
     if (this.eligibleFiles.length === 0) {
       this.fileListEl.createEl('p', { 
-        text: 'No files found with URLs missing OpenGraph data.',
+        text: 'No files found that have a URL but are missing OpenGraph data.',
         cls: 'batch-no-files'
       });
       return;
@@ -492,26 +489,26 @@ export class BatchMetafetchModal extends Modal {
       };
       
       // File name
-      container.createEl('div', {
+      container.createDiv({
         text: file.name,
         cls: 'opengraph-option-label'
       });
       
       // File path
-      container.createEl('div', {
+      container.createDiv({
         text: file.path,
         cls: 'opengraph-option-description'
       });
       
       // URL
-      container.createEl('div', {
+      container.createDiv({
         text: `URL: ${file.url}`,
         cls: 'opengraph-option-description'
       });
       
       // Missing fields
       if (file.missingFields.length > 0) {
-        container.createEl('div', {
+        container.createDiv({
           text: `Missing: ${file.missingFields.join(', ')}`,
           cls: 'opengraph-option-description'
         });
@@ -572,7 +569,7 @@ export class BatchMetafetchModal extends Modal {
 
     // Validate that at least one action can be performed
     if (!this.options.overwriteExisting && !this.options.createNewProperties) {
-      this.statusEl?.setText('Error: At least one action must be enabled (Overwrite Existing or Create New Properties)');
+      this.statusEl?.setText('Error: at least one action must be enabled (overwrite existing or create new properties)');
       return;
     }
 
@@ -619,7 +616,7 @@ export class BatchMetafetchModal extends Modal {
         
         // Delay between files
         if (i < selectedFilePaths.length - 1 && this.progress.isProcessing) {
-          await new Promise(resolve => setTimeout(resolve, this.options.batchDelay));
+          await new Promise(resolve => window.setTimeout(resolve, this.options.batchDelay));
         }
       }
       
@@ -664,11 +661,11 @@ export class BatchMetafetchModal extends Modal {
     }
   }
 
-  private async updateFileMetadata(filePath: string, url: string, data: any): Promise<void> {
+  private async updateFileMetadata(filePath: string, url: string, data: OpenGraphData): Promise<void> {
     const file = this.app.vault.getAbstractFileByPath(filePath);
     if (!file || !(file instanceof TFile)) return; // Ensure it's a file, not a folder
     
-    const content = await this.app.vault.read(file as any);
+    const content = await this.app.vault.read(file);
     const frontmatter = extractFrontmatter(content);
     
     if (!frontmatter) return;
@@ -735,11 +732,11 @@ export class BatchMetafetchModal extends Modal {
       // Replace only the frontmatter part while preserving the rest of the content
       const updatedFrontmatter = formatFrontmatter(frontmatter);
       const updatedContent = content.replace(frontmatterRegex, `---\n${updatedFrontmatter}\n---`);
-      await this.app.vault.modify(file as any, updatedContent);
+      await this.app.vault.modify(file, updatedContent);
     } else {
       // Fallback to the original behavior if no frontmatter is found
       const updatedContent = formatFrontmatter(frontmatter);
-      await this.app.vault.modify(file as any, updatedContent);
+      await this.app.vault.modify(file, updatedContent);
     }
   }
 
@@ -779,9 +776,9 @@ export class BatchMetafetchModal extends Modal {
       const file = this.app.vault.getAbstractFileByPath(filePath);
       if (!file || !(file instanceof TFile)) return;
 
-      const content = await this.app.vault.read(file as any);
+      const content = await this.app.vault.read(file);
       const existingFrontmatter = extractFrontmatter(content);
-      const frontmatterObject: Record<string, any> = existingFrontmatter || {};
+      const frontmatterObject: Record<string, unknown> = existingFrontmatter || {};
 
       // Add error information
       frontmatterObject.og_error = errorMessage;
@@ -804,7 +801,7 @@ export class BatchMetafetchModal extends Modal {
       const newContent = content.replace(/---\n(.*?)\n---/s, `---\n${newFrontmatter}\n---`);
       const finalContent = newContent.startsWith('---') ? newContent : `---\n${newFrontmatter}\n---\n${content}`;
       
-      await this.app.vault.modify(file as any, finalContent);
+      await this.app.vault.modify(file, finalContent);
     } catch (writeError) {
       console.error('Failed to write error to frontmatter:', writeError);
     }

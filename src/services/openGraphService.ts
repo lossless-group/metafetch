@@ -3,6 +3,30 @@ import { Notice, requestUrl } from 'obsidian';
 import type { PluginSettings, OpenGraphData } from '../types/open-graph-service';
 import { extractFrontmatter } from '../utils/yamlFrontmatter';
 
+/** One metadata source block in the OpenGraph.io response. */
+interface OpenGraphIoNode {
+  title?: string;
+  description?: string;
+  image?: string;
+  favicon?: string;
+  url?: string;
+  site_name?: string;
+  type?: string;
+}
+
+/** The openGraph block may carry the image as a bare string or as an object. */
+interface OpenGraphIoOgNode extends Omit<OpenGraphIoNode, 'image'> {
+  image?: string | { url?: string };
+}
+
+/** Shape of the OpenGraph.io site-extraction response we rely on. */
+interface OpenGraphIoResponse {
+  hybridGraph?: OpenGraphIoNode;
+  openGraph?: OpenGraphIoOgNode;
+  htmlInferred?: OpenGraphIoNode;
+  favicon?: string;
+}
+
 export class OpenGraphServiceError extends Error {
   constructor(message: string, public readonly code: string) {
     super(message);
@@ -55,7 +79,7 @@ export class OpenGraphService {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        const data = response.json;
+        const data = response.json as OpenGraphIoResponse;
         
         // Validate response structure - check for any available data source
         if (!data.hybridGraph && !data.openGraph && !data.htmlInferred) {
@@ -63,15 +87,17 @@ export class OpenGraphService {
         }
         
         // Use hybridGraph as primary source, with fallbacks to openGraph and htmlInferred
-        const hybrid = data.hybridGraph || {};
-        const og = data.openGraph || {};
-        const inferred = data.htmlInferred || {};
+        const hybrid: OpenGraphIoNode = data.hybridGraph || {};
+        const og: OpenGraphIoOgNode = data.openGraph || {};
+        const inferred: OpenGraphIoNode = data.htmlInferred || {};
+        const ogImageUrl = typeof og.image === 'object' ? og.image.url : undefined;
+        const ogImageString = typeof og.image === 'string' ? og.image : undefined;
         
         // Extract and normalize OpenGraph data using priority: hybridGraph > openGraph > htmlInferred
         const ogData: OpenGraphData = {
           title: hybrid.title || og.title || inferred.title || '',
           description: hybrid.description || og.description || inferred.description || '',
-          image: hybrid.image || og.image?.url || og.image || inferred.image || '',
+          image: hybrid.image || ogImageUrl || ogImageString || inferred.image || '',
           favicon: hybrid.favicon || og.favicon || inferred.favicon || data.favicon || null,
           url: hybrid.url || og.url || inferred.url || url,
           site_name: hybrid.site_name || og.site_name || inferred.site_name || '',
@@ -85,7 +111,7 @@ export class OpenGraphService {
         if (attempt === maxRetries - 1) break;
 
         // Exponential backoff
-        await new Promise(resolve => setTimeout(resolve, currentDelay));
+        await new Promise(resolve => window.setTimeout(resolve, currentDelay));
         currentDelay *= 2;
       }
     }
@@ -165,7 +191,7 @@ export class OpenGraphService {
         throw new Error(`Screenshot fetch failed: ${response.status}`);
       }
 
-      const data = response.json;
+      const data = response.json as { url: string };
       return data.url;
     } catch (error: unknown) {
       console.error('Screenshot fetch error:', error);

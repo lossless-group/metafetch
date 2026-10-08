@@ -66,7 +66,7 @@ export class DirectoryScanner {
     }
   }
 
-  private checkMissingOpenGraphFields(frontmatter: any, settings: PluginSettings): string[] {
+  private checkMissingOpenGraphFields(frontmatter: Record<string, unknown>, settings: PluginSettings): string[] {
     const missingFields: string[] = [];
     
     // Check each configurable field
@@ -77,7 +77,7 @@ export class DirectoryScanner {
     ];
 
     for (const field of fieldsToCheck) {
-      if (!frontmatter[field.key] || frontmatter[field.key] === '') {
+      if (!frontmatter[field.key]) {
         missingFields.push(field.name);
       }
     }

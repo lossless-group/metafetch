@@ -61,7 +61,7 @@ export function collectExistingHexCodes(app: App, fieldName: string): Set<string
   const existing = new Set<string>();
 
   for (const file of app.vault.getMarkdownFiles()) {
-    const value = app.metadataCache.getFileCache(file)?.frontmatter?.[fieldName];
+    const value: unknown = app.metadataCache.getFileCache(file)?.frontmatter?.[fieldName];
     if (typeof value === 'string' && value) existing.add(value);
     // Tolerate a list-valued field rather than skipping it — a code that IS in
     // use must not be handed out again just because it's stored oddly.

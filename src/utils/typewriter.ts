@@ -44,10 +44,13 @@ export class Typewriter {
     this.loop = options.loop ?? true;
     this.smartBackspace = options.smartBackspace ?? true;
 
-    this.cursorEl = el.ownerDocument.createElement('span');
-    this.cursorEl.className = 'typed-cursor';
-    this.cursorEl.textContent = options.cursorChar ?? '|';
-    el.insertAdjacentElement('afterend', this.cursorEl);
+    // createSpan appends inside `el`; insertAdjacentElement then moves it to be a sibling.
+    const cursorEl = el.createSpan({
+      cls: 'typed-cursor',
+      text: options.cursorChar ?? '|',
+    });
+    this.cursorEl = cursorEl;
+    el.insertAdjacentElement('afterend', cursorEl);
 
     this.type(0, 0);
   }

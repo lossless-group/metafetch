@@ -66,11 +66,11 @@ export class MetafetchModal extends Modal {
         type: 'checkbox',
         cls: 'opengraph-checkbox'
       });
-      checkbox.checked = this.options[optionKey] as boolean;
+      checkbox.checked = this.options[optionKey];
       checkbox.onchange = (e: Event) => {
         const target = e.target as HTMLInputElement;
         const newValue = target.checked;
-        (this.options[optionKey] as boolean) = newValue;
+        this.options[optionKey] = newValue;
         
         // Prevent both overwriteExisting and createNewProperties from being unchecked
         this.handleCheckboxLogic(optionKey, newValue);
@@ -95,7 +95,7 @@ export class MetafetchModal extends Modal {
     this.statusEl = contentEl.createDiv('opengraph-status');
     this.statusEl.setText('Ready to fetch metadata');
     
-    this.progressBar = contentEl.createEl('progress') as HTMLProgressElement;
+    this.progressBar = contentEl.createEl('progress');
     this.progressBar.addClass('opengraph-progress');
     this.progressBar.max = 100;
     this.progressBar.value = 0;
@@ -103,11 +103,11 @@ export class MetafetchModal extends Modal {
     // Buttons with Obsidian styling
     const buttonContainer = contentEl.createDiv('opengraph-button-container');
     const fetchButton = buttonContainer.createEl('button', { 
-      text: 'Fetch for this File',
+      text: 'Fetch for this file',
       cls: 'mod-cta opengraph-fetch-btn'
     });
     fetchButton.onclick = () => {
-      this.fetchMetadata();
+      void this.fetchMetadata();
     };
     
     this.cancelButton = buttonContainer.createEl('button', { 
@@ -126,12 +126,12 @@ export class MetafetchModal extends Modal {
     this.processing = false;
     // Cancel any ongoing animation
     if (this.animationFrameId) {
-      cancelAnimationFrame(this.animationFrameId);
+      window.cancelAnimationFrame(this.animationFrameId);
       this.animationFrameId = null;
     }
     // Clear any ongoing progress interval
     if (this.progressIntervalId) {
-      clearInterval(this.progressIntervalId);
+      window.clearInterval(this.progressIntervalId);
       this.progressIntervalId = null;
     }
     // Clear any ongoing loading message interval
@@ -170,7 +170,7 @@ export class MetafetchModal extends Modal {
     
     // Create a span element for the typing animation
     this.statusEl.empty();
-    const typingElement = this.statusEl.createEl('span', { cls: 'typing-element' });
+    const typingElement = this.statusEl.createSpan({ cls: 'typing-element' });
     
     // Cycle the loading messages with the in-repo typewriter animation
     this.typedInstance = new Typewriter(typingElement, {
@@ -190,7 +190,7 @@ export class MetafetchModal extends Modal {
   private stopLoadingMessages(): void {
     // Clear any ongoing interval
     if (this.loadingMessageIntervalId) {
-      clearInterval(this.loadingMessageIntervalId);
+      window.clearInterval(this.loadingMessageIntervalId);
       this.loadingMessageIntervalId = null;
     }
     
@@ -234,7 +234,7 @@ export class MetafetchModal extends Modal {
 
       const content = await this.app.vault.read(file);
       const existingFrontmatter = extractFrontmatter(content);
-      const frontmatterObject: Record<string, any> = existingFrontmatter || {};
+      const frontmatterObject: Record<string, unknown> = existingFrontmatter || {};
 
       // Add error information
       frontmatterObject.og_error = errorMessage;
@@ -290,7 +290,7 @@ export class MetafetchModal extends Modal {
         this.progressBar!.value = currentValue;
         
         if (progress < 1) {
-          this.animationFrameId = requestAnimationFrame(animate);
+          this.animationFrameId = window.requestAnimationFrame(animate);
         } else {
           this.progressBar!.value = targetValue;
           this.animationFrameId = null;
@@ -298,7 +298,7 @@ export class MetafetchModal extends Modal {
         }
       };
 
-      this.animationFrameId = requestAnimationFrame(animate);
+      this.animationFrameId = window.requestAnimationFrame(animate);
     });
   }
 
@@ -312,16 +312,16 @@ export class MetafetchModal extends Modal {
     const increment = 10;
     const interval = 2000; // 2 seconds
 
-    const progressInterval = setInterval(() => {
+    const progressInterval = window.setInterval(() => {
       if (!this.processing || currentProgress >= 90) {
-        clearInterval(progressInterval);
+        window.clearInterval(progressInterval);
         return;
       }
 
       currentProgress += increment;
       if (currentProgress > 90) currentProgress = 90;
       
-      this.animateProgressTo(currentProgress, 300); // Quick 300ms animation for each increment
+      void this.animateProgressTo(currentProgress, 300); // Quick 300ms animation for each increment
     }, interval);
 
     // Store the interval ID for cleanup
@@ -334,7 +334,7 @@ export class MetafetchModal extends Modal {
   private completeProgress(): Promise<void> {
     // Clear any ongoing incremental progress
     if (this.progressIntervalId) {
-      clearInterval(this.progressIntervalId);
+      window.clearInterval(this.progressIntervalId);
       this.progressIntervalId = null;
     }
     
@@ -347,7 +347,7 @@ export class MetafetchModal extends Modal {
 
     // Validate that at least one action can be performed
     if (!this.options.overwriteExisting && !this.options.createNewProperties) {
-      this.statusEl?.setText('Error: At least one action must be enabled (Overwrite Existing or Create New Properties)');
+      this.statusEl?.setText('Error: at least one action must be enabled (overwrite existing or create new properties)');
       return;
     }
 
@@ -448,7 +448,7 @@ export class MetafetchModal extends Modal {
 
       // Extract existing frontmatter
       const existingFrontmatter = extractFrontmatter(content);
-      const frontmatterObject: Record<string, any> = existingFrontmatter || {};
+      const frontmatterObject: Record<string, unknown> = existingFrontmatter || {};
 
       // Update with new OpenGraph data using configurable field names
       if (this.options.createNewProperties || !frontmatterObject.url) {

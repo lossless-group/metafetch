@@ -1,5 +1,3 @@
-import type { PluginSettingTab } from 'obsidian';
-
 export interface PluginSettings {
   apiKey: string;
   baseUrl: string;
@@ -33,8 +31,4 @@ export interface OpenGraphData {
   error?: string;
   date?: string;
   fetchDate?: string;
-}
-
-export interface MetafetchPluginSettingsTab extends PluginSettingTab {
-  plugin: MetafetchPlugin;
 }
