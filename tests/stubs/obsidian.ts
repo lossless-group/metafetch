@@ -8,6 +8,8 @@
 // calls getSettingDefinitions() immediately, so a settings tab that throws
 // while building its definitions fails onload() here as it would in the app.
 
+import { parse as parseYamlText } from 'yaml';
+
 export interface StubRequest {
     url: string;
     method?: string;
@@ -53,6 +55,17 @@ export class Modal {
     constructor(public app?: unknown) {}
     open(): void {}
     close(): void {}
+}
+
+export class SuggestModal<T> extends Modal {
+    setPlaceholder(_text: string): void {}
+    getSuggestions(_query: string): T[] { return []; }
+}
+
+// The real parseYaml is Obsidian's bundled YAML parser; tests use the
+// `yaml` package (a devDependency only, never in main.js).
+export function parseYaml(text: string): unknown {
+    return parseYamlText(text) as unknown;
 }
 
 export class ButtonComponent {

@@ -75,7 +75,7 @@ export function decodeEntities(s: string): string {
  * or bare. Minified pages (electronjs.org) write `content=https://…` with no
  * quotes at all, which the old quoted-only pattern never matched.
  */
-function attr(tag: string, name: string): string | undefined {
+export function attr(tag: string, name: string): string | undefined {
   const m = tag.match(new RegExp(`(?:^|[\\s"'])${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s"'>]+))`, 'i'));
   const v = m ? (m[1] ?? m[2] ?? m[3]) : undefined;
   return v === undefined ? undefined : decodeEntities(v).trim();
@@ -169,7 +169,7 @@ function getTitleTag(html: string): string | null {
   return m && m[1] ? decodeEntities(m[1]).trim() : null;
 }
 
-function resolveAgainstBase(href: string, baseUrl: string): string {
+export function resolveAgainstBase(href: string, baseUrl: string): string {
   try {
     return new URL(href, baseUrl).href;
   } catch {
@@ -214,7 +214,7 @@ function linkTags(html: string, baseUrl: string): LinkTag[] {
 }
 
 /** Every JSON-LD node on the page, flattened through @graph and arrays. */
-function jsonLdNodes(html: string): Record<string, unknown>[] {
+export function jsonLdNodes(html: string): Record<string, unknown>[] {
   const nodes: Record<string, unknown>[] = [];
   const visit = (v: unknown): void => {
     if (Array.isArray(v)) { v.forEach(visit); return; }
@@ -235,7 +235,7 @@ function jsonLdNodes(html: string): Record<string, unknown>[] {
   return nodes;
 }
 
-function nodeTypes(node: Record<string, unknown>): string[] {
+export function nodeTypes(node: Record<string, unknown>): string[] {
   const t = node['@type'];
   return (Array.isArray(t) ? t : [t]).filter((x): x is string => typeof x === 'string');
 }
@@ -500,8 +500,8 @@ export function parseDirectFetchHtml(html: string, url: string): OpenGraphData {
   return result;
 }
 
-/** One GET with `throw: false`. Throws DirectFetchError on any failure. */
-export async function fetchDirectOpenGraph(url: string): Promise<OpenGraphData> {
+/** One GET with `throw: false`; the page's HTML. Throws DirectFetchError on any failure. */
+export async function fetchPageHtml(url: string): Promise<string> {
   let res;
   try {
     res = await requestUrl({ url, method: 'GET', throw: false });
@@ -520,7 +520,11 @@ export async function fetchDirectOpenGraph(url: string): Promise<OpenGraphData> 
   if (!html) {
     throw new DirectFetchError(`Empty response from ${url}`, 'EMPTY_RESPONSE');
   }
+  return html;
+}
 
+/** Parses fetched HTML, treating a bot-check or error page as a failed fetch. */
+export function parseOrReject(html: string, url: string): OpenGraphData {
   const data = parseDirectFetchHtml(html, url);
   if (isJunkTitle(data.title)) {
     throw new DirectFetchError(
@@ -529,4 +533,9 @@ export async function fetchDirectOpenGraph(url: string): Promise<OpenGraphData> 
     );
   }
   return data;
+}
+
+/** One GET, parsed. Throws DirectFetchError on any failure. */
+export async function fetchDirectOpenGraph(url: string): Promise<OpenGraphData> {
+  return parseOrReject(await fetchPageHtml(url), url);
 }

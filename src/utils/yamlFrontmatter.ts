@@ -237,3 +237,16 @@ export async function updateFileFrontmatter(file: TFile, newFrontmatter: string)
     await file.vault.modify(file, newContent);
   }
 }
+
+/**
+ * The note's content with its frontmatter block replaced (or added) by `next`.
+ * A replacer function, not a replacement string: a value containing `$&` or
+ * `$1` would otherwise be expanded by String.replace.
+ */
+export function withFrontmatter(content: string, next: Record<string, unknown>): string {
+  const block = `---\n${formatFrontmatter(next)}\n---`;
+  const frontmatterRegex = /^---\n((?:.|\n)*?)\n---/;
+  return frontmatterRegex.test(content)
+    ? content.replace(frontmatterRegex, () => block)
+    : `${block}\n${content}`;
+}

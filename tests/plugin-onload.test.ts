@@ -18,14 +18,16 @@ interface StubPlugin {
     onload(): Promise<void>;
 }
 
-// Every command ID 0.1.7 registers. IDs are what user hotkeys bind to, so
-// they must not change.
+// Every command ID: the five from 0.1.7, plus the folder-profile pair.
+// IDs are what user hotkeys bind to, so they must not change.
 const COMMAND_IDS = [
     'fetch-opengraph-data',
     'batch-fetch-opengraph-data',
     'direct-fetch-from-script',
     'fetch-via-microlink',
     'fetch-from-frontmatter-url',
+    'fill-from-folder-profile',
+    'create-example-frontmatter-profile',
 ];
 
 function makePlugin(storedData: unknown = null): StubPlugin {

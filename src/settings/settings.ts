@@ -31,6 +31,9 @@ export interface MetafetchSettings {
     stampHexCode: boolean;
     hexCodeFieldName: string;
     hexCodeLength: number;
+
+    /** Vault folder holding folder profiles (metafetch-profile files). */
+    profilesRoot: string;
 }
 
 export const DEFAULT_SETTINGS: MetafetchSettings = {
@@ -59,6 +62,8 @@ export const DEFAULT_SETTINGS: MetafetchSettings = {
     stampHexCode: false,
     hexCodeFieldName: 'hex_code',
     hexCodeLength: 6,
+
+    profilesRoot: 'zz-cf-lib/frontmatter',
 };
 
 type SettingKey = keyof MetafetchSettings;
@@ -200,6 +205,17 @@ export class MetafetchSettingTab extends PluginSettingTab {
                         desc: 'The properties every fetch command writes. Defaults follow the og_* convention.',
                     },
                     ...fieldRows,
+                ],
+            },
+            {
+                type: 'group',
+                heading: 'Folder profiles',
+                items: [
+                    {
+                        name: 'Profiles folder',
+                        desc: 'Where folder profiles live. A profile names the frontmatter a folder\'s notes should carry, such as a Tooling note\'s GitHub, LinkedIn, and X links, and "Fill frontmatter from folder profile" fills the empty ones.',
+                        control: { type: 'folder', key: 'profilesRoot', placeholder: DEFAULT_SETTINGS.profilesRoot },
+                    },
                 ],
             },
             {

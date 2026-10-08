@@ -22,6 +22,9 @@ await esbuild.build({
     target: 'node22',
     outExtension: { '.js': '.mjs' },
     alias: { obsidian: path.join(root, 'tests/stubs/obsidian.ts') },
+    // The stub's YAML parser loads from node_modules at runtime; bundling its
+    // CommonJS build into ESM breaks on a dynamic require.
+    external: ['yaml'],
     logLevel: 'warning',
 });
 

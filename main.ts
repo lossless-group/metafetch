@@ -6,11 +6,14 @@ import { MetafetchSettingTab, DEFAULT_SETTINGS, type MetafetchSettings } from '.
 import { fetchDirectOpenGraph } from './src/services/directFetchService';
 import { fetchMicrolinkOpenGraph } from './src/services/microlinkFetchService';
 import type { OpenGraphData } from './src/types/open-graph-service';
-import { extractFrontmatter, formatFrontmatter } from './src/utils/yamlFrontmatter';
+import { extractFrontmatter, withFrontmatter } from './src/utils/yamlFrontmatter';
 import { collectFrontmatterUrls } from './src/utils/frontmatterUrls';
 import { SelectUrlModal } from './src/modals/SelectUrlModal';
 import type { FetchProvider } from './src/modals/SelectUrlModal';
 import { stampIdentityCode } from './src/utils/hexCode';
+import { createExampleProfile, fillFromProfile } from './src/commands/fillFromProfile';
+import { SelectProfileModal } from './src/modals/SelectProfileModal';
+import type { FrontmatterProfile } from './src/services/frontmatterProfiles';
 
 export default class MetafetchPlugin extends Plugin {
     // Obsidian 1.13.0 added `settings?: unknown` to the Plugin base class and
@@ -97,6 +100,28 @@ export default class MetafetchPlugin extends Plugin {
                 void this.chooseFrontmatterUrl();
             }
         });
+
+        // Command: fill the fields the note's folder profile asks for
+        // (zz-cf-lib/frontmatter/), e.g. a Tooling note's socials.
+        this.addCommand({
+            id: 'fill-from-folder-profile',
+            name: 'Fill frontmatter from folder profile',
+            editorCallback: (_editor: Editor) => {
+                void fillFromProfile(this.app, this.settings.profilesRoot, profiles => this.pickProfile(profiles));
+            }
+        });
+
+        this.addCommand({
+            id: 'create-example-frontmatter-profile',
+            name: 'Create example frontmatter profile',
+            callback: () => {
+                void createExampleProfile(this.app, this.settings.profilesRoot);
+            }
+        });
+    }
+
+    private pickProfile(profiles: FrontmatterProfile[]): Promise<FrontmatterProfile | null> {
+        return new Promise(resolve => new SelectProfileModal(this.app, profiles, resolve).open());
     }
 
     /**
@@ -174,11 +199,7 @@ export default class MetafetchPlugin extends Plugin {
             delete next.og_error_timestamp;
             delete next.og_error_code;
 
-            const newFrontmatter = formatFrontmatter(next);
-            const frontmatterRegex = /^---\n((?:.|\n)*?)\n---/;
-            const newContent = content.match(frontmatterRegex)
-                ? content.replace(frontmatterRegex, `---\n${newFrontmatter}\n---`)
-                : `---\n${newFrontmatter}\n---\n${content}`;
+            const newContent = withFrontmatter(content, next);
             await this.app.vault.modify(file, newContent);
 
             pending.hide();
