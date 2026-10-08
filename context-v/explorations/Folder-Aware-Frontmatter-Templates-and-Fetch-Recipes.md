@@ -33,6 +33,7 @@ related:
 
 - [Why Care?](#why-care)
 - [What the vault already tells us](#what-the-vault-already-tells-us)
+- [The first profile: a Tooling note's socials](#the-first-profile-a-tooling-notes-socials)
 - [Three ideas, kept apart](#three-ideas-kept-apart)
 - [1. Frontmatter profiles](#1-frontmatter-profiles)
 - [2. Fetch recipes](#2-fetch-recipes)
@@ -64,6 +65,77 @@ Two things stand out:
 
 - **Each folder already has a schema; it just isn't written down.** The keys are consistent within a folder and different across folders, which is exactly what a per-folder template captures.
 - **The same idea goes by several names.** `image` / `og_image`, `favicon` / `og_favicon`, `site_name` / `og_site_name`, `author` / `authors`, plus typo'd keys (`wi`, `wik`). A profile that declares canonical names and aliases could normalize these as it fills them.
+
+## The first profile: a Tooling note's socials
+
+The concrete want: for a Tooling note, find the GitHub org, the LinkedIn company page, and the rest of the company's social profiles.
+
+### What's there today
+
+Of about 1,200 Tooling notes with a `url`, very few carry any social property, and the ones that do disagree on names:
+
+| Property | Notes | |
+|---|---|---|
+| `github_repo_url` | 117 | one specific repository |
+| `github_profile_url` | 36 | the organization (or user) profile; plus 10 as the typo `github_profle_url` |
+| `github_url` | 15 | older, less specific key; the operator is sorting these by hand |
+| `youtube_channel_url` | 13 | plus 3 as `youtube_url_channel` |
+| `linkedin_url` | 9 | |
+| `x_url` | 7 | |
+| `crunchbase_url` | 1 | |
+
+### What the direct parser can find (probe, 2026-10-08)
+
+We fetched 80 random Tooling homepages and classified every link and JSON-LD `sameAs` entry. 73 responded, 7 refused (403s and timeouts):
+
+| Platform | Found | Platform | Found |
+|---|---|---|---|
+| X / Twitter | 53 (73%) | Instagram | 16 (22%) |
+| LinkedIn company | 46 (63%) | Discord | 13 (18%) |
+| GitHub | 38 (52%) | Facebook | 11 (15%) |
+| YouTube | 32 (44%) | Bluesky, Mastodon, Crunchbase | 2–3 each |
+
+31 of the 73 pages declare their profiles in JSON-LD `sameAs`, which is the page saying "these are mine". The rest have them as footer links. So this is mostly a **direct-parser** job: free, no secrets, no new network destinations. Web extraction is the fallback for the ~10% of sites that refuse a plain fetch or render with JavaScript, and a model is the fallback for nothing; a model shouldn't guess a URL.
+
+### The parsing is the easy part; choosing is the hard part
+
+A homepage links to many profiles that aren't the company's own. The probe surfaced the cases a chooser must handle:
+
+- **Repo vs. org.** Tina links `github.com/tinacms/tinacms`. That's a repo, so it yields both `github_repo_url` and the org `github.com/tinacms`.
+- **Share and intent links.** `twitter.com/intent/tweet`, `facebook.com/sharer`, and `linkedin.com/shareArticle` are buttons, not profiles. They need a denylist of paths.
+- **GitHub's own pages.** `github.com/features`, `/sponsors`, `/marketplace`, and similar aren't orgs.
+- **Other people's profiles.** Customer logos, "built with" badges, investor and integration-partner links, and an author's personal X handle on a blog page. Ranking has to prefer, in order:
+  1. JSON-LD `sameAs` on an Organization node;
+  2. links in `<footer>` or a header nav;
+  3. handles that resemble the site's domain or `og:site_name` (`glideapps.com` → `@glideapps`);
+  4. the link that appears most often.
+  When two candidates tie, write neither and report both, rather than guess.
+- **Deep URLs.** A note's `url` is sometimes a product page or a docs page. Socials live on the homepage, so the socials fields should fetch the site root, the way Cite Wide's publisher-brand lookup already does.
+- **Normalization.** Strip tracking parameters and trailing slashes, `twitter.com` → `x.com`, `linkedin.com/company/x/about` → `linkedin.com/company/x`. The URL that's written should be canonical, so later runs compare equal.
+
+### Proposed Tooling fields
+
+Keep the names the vault already uses most, and adopt the drifted ones as aliases:
+
+```metafetch-profile
+fields:
+  github_profile_url:  { type: url, platform: github-org,  aliases: [github_profle_url], from: [direct, firecrawl] }
+  github_repo_url:     { type: url, platform: github-repo, from: [direct, firecrawl] }
+  linkedin_url:        { type: url, platform: linkedin-company, from: [direct, firecrawl] }
+  x_url:               { type: url, platform: x, from: [direct, firecrawl] }
+  youtube_channel_url: { type: url, platform: youtube, aliases: [youtube_url_channel], from: [direct, firecrawl] }
+  discord_url:         { type: url, platform: discord, from: [direct] }
+  instagram_url:       { type: url, platform: instagram, from: [direct] }
+  facebook_url:        { type: url, platform: facebook, from: [direct] }
+  bluesky_url:         { type: url, platform: bluesky, from: [direct] }
+  crunchbase_url:      { type: url, platform: crunchbase, from: [direct, firecrawl] }
+```
+
+`platform:` is a new field attribute: it names a built-in classifier (match rules, denylist, normalization) instead of making every profile author write regexes.
+
+The GitHub pair follows the vault's meaning: `github_profile_url` is the organization (`github.com/tinacms`), and `github_repo_url` is one repository (`github.com/tinacms/tinacms`). A repo link found on a page fills both. **`github_url` is deliberately left out:** it's the older, less specific key, and the operator is working through those notes by hand. Metafetch neither reads it as an alias nor writes it.
+
+This is a natural **slice 1**: the profile loader, plus one deterministic extractor family, against a measured target.
 
 ## Three ideas, kept apart
 
