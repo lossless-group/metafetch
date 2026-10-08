@@ -41,7 +41,12 @@ export async function requestUrl(req: StubRequest): Promise<StubResponse> {
 }
 
 export class Notice {
-    constructor(public message?: string) {}
+    /** Every notice shown, so tests can assert what the user was told. */
+    static shown: string[] = [];
+    constructor(public message?: string, _duration?: number) {
+        if (message) Notice.shown.push(message);
+    }
+    hide(): void {}
 }
 
 export class Modal {

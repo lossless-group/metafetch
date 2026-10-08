@@ -155,9 +155,13 @@ export default class MetafetchPlugin extends Plugin {
             // holds it yet). Fetching the `arxiv:` property shouldn't quietly
             // mint a duplicate `url:` the note never had.
             if (!explicitUrl || !fm.url) next.url = url;
-            next[s.titleFieldName] = data.title;
-            next[s.descriptionFieldName] = data.description;
-            next[s.imageFieldName] = data.image;
+            // A field the page didn't supply keeps what the note already has.
+            // Writing `og_image: null` on a miss erased images that an earlier
+            // fetch, another provider, or the operator had put there.
+            if (data.title) next[s.titleFieldName] = data.title;
+            if (data.description) next[s.descriptionFieldName] = data.description;
+            if (data.image) next[s.imageFieldName] = data.image;
+            else if (!(s.imageFieldName in next)) next[s.imageFieldName] = null;
             if (data.favicon) next[s.faviconFieldName] = data.favicon;
             if (data.site_name) next[s.siteNameFieldName] = data.site_name;
             if (data.type) next[s.typeFieldName] = data.type;
