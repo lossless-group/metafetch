@@ -19,6 +19,7 @@ It works the same way for notes about papers, articles, and companies. Fetch onc
 - **The share image comes through.** Direct Fetch finds it in `og:image` (including its `:url` and `:secure_url` forms), `twitter:image`, schema.org microdata, `<link rel="image_src">`, and JSON-LD. It reads tags however the page writes them.
 - **Nothing gets erased.** If a page has no image, title, or description, your note keeps the one it had.
 - **Better authors, cleaner text.** Apostrophes and HTML entities come through intact. Bylines are found in JSON-LD and visible author lines, and reading times are no longer stored as authors. Bot-check pages count as a failed fetch.
+- **Socials from a folder profile.** For a note under `Tooling/`, Metafetch reads the company's homepage and fills its GitHub org and repo, LinkedIn page, X, YouTube, Discord, and more. It only fills empty fields, and when the page links two equally likely profiles it writes neither.
 - **Searchable settings** on Obsidian 1.13's settings API.
 
 Full notes: [changelog/releases/0.2.0.md](changelog/releases/0.2.0.md).
@@ -30,6 +31,8 @@ Full notes: [changelog/releases/0.2.0.md](changelog/releases/0.2.0.md).
 | **Direct fetch from script** | Fetches the page itself and reads its Open Graph, Twitter, schema.org, and scholarly (`citation_*`) tags. | Nothing. No key, no rate limit. |
 | **Fetch via Microlink** | Same fields, through the Microlink API. | Nothing for about 50 requests a day; an optional key raises the limit. |
 | **Fetch from a frontmatter URL…** | Lists every URL in the note's frontmatter, under any property (`url`, `arxiv`, `doi`…), and fetches the one you pick with the provider you pick. | Depends on the provider. |
+| **Fill frontmatter from folder profile** | Fills the empty fields the note's folder profile asks for, such as a Tooling note's social links, from the company's own homepage. | Nothing. A profile in `zz-cf-lib/frontmatter/`. |
+| **Create example frontmatter profile** | Writes a Tooling socials profile into the profiles folder to start from. | Nothing. |
 | **Fetch Open Graph data for current file** | Opens a modal: overwrite or only fill in missing fields, record errors, update the fetch date. | An OpenGraph.io key. |
 | **Batch fetch Open Graph data** | Scans the current folder for notes with a URL and missing metadata, then processes them with a delay between requests. | An OpenGraph.io key. |
 
@@ -58,6 +61,37 @@ og_last_fetch: "2026-10-08T15:04:05.000Z"
 ```
 
 Every key name is configurable under **Settings → Metafetch → Field names**. An optional **vault identity code** (`hex_code: k4m2x9`) can be stamped on each fetched note, so you can reference it by something steadier than its filename.
+
+### Folder profiles
+
+A folder profile says which frontmatter a folder's notes should carry. It's an ordinary note in `zz-cf-lib/frontmatter/`, so you edit it in Obsidian:
+
+````markdown
+---
+title: Tooling socials
+applies-to-paths:
+  - "Tooling/**"
+---
+
+```metafetch-profile
+fields:
+  github_profile_url: { platform: github-org, aliases: [github_profle_url] }
+  github_repo_url:    { platform: github-repo }
+  linkedin_url:       { platform: linkedin-company }
+  x_url:              { platform: x }
+  og_image:           { page: image, aliases: [image] }
+```
+````
+
+Run **Create example frontmatter profile** to get the full Tooling version, then **Fill frontmatter from folder profile** on a Tooling note. How a social link is chosen:
+
+1. Profiles the site lists in its structured data (JSON-LD `sameAs`) win.
+2. Then links in the footer, then in the header or navigation.
+3. A handle that resembles the site's domain or name counts in its favour.
+4. A link only in the page body, unrelated to the brand, is never used. That keeps customer logos and partner links out.
+5. If two links tie, neither is written, and the notice names both.
+
+A field that already has a value, under its own name or an alias, is never changed.
 
 ## Getting started
 

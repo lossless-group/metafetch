@@ -31,6 +31,8 @@ related:
 
 # Folder-Aware Frontmatter Templates and Fetch Recipes
 
+> **Status, 2026-10-08:** slice 1 (profiles plus the direct parser, aimed at Tooling socials) is built: see `context-v/plans/2026-10-08_Folder-Profiles-and-Social-Links.md`. It settles questions 1–3 provisionally: the parser is copied into Metafetch, aliases are read-through only, and no provenance is written. Profile fields use `platform:` or `page:`; `from:` is honoured only as "includes `direct` or not". On 20 real Tooling notes, three homepages refused a plain fetch (403, 429, 525). Those are the first concrete case for slice 2.
+
 - [Why Care?](#why-care)
 - [What the vault already tells us](#what-the-vault-already-tells-us)
 - [The first profile: a Tooling note's socials](#the-first-profile-a-tooling-notes-socials)
