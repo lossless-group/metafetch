@@ -1,109 +1,104 @@
 ![Metafetch: An Obsidian Community Plugin by The Lossless Group](https://i.imgur.com/0v6sPkv.png)
 
-# Metafetch Obsidian Plugin
+# Metafetch
 
-An Obsidian plugin that allows you to fetch Open Graph data from a URL using OpenGraph.io.
+Turn a URL in a note's frontmatter into a link card's worth of metadata: title, description, share image, favicon, site name, authors, and publication date. Use it with no API key, or through OpenGraph.io or Microlink.
 
-## Version 1.3
-- Wider, more elegant modal
-- Additional Microlink API support (Free, requires API key)
+**Requires Obsidian 1.13 or newer.** Desktop only.
 
-## Why Care?  How we use it...
+## Why Care?
 
-We manage our site-wide content with Obsidian for ease of use and speed of development. We have a "toolkit" section (and subsections, as well as tag filters) for reviewing applications and web services. To make it more visually compelling, we use Open Graph data to display images and titles in our notes. 
+We manage our site-wide content in Obsidian. Our toolkit section reviews applications and web services, and each review is a note whose frontmatter becomes a card on the site. Metafetch fills in those cards.
 
 ![Lossless Toolkit on The Lossless Group Website](https://i.imgur.com/WX7aIHB.gif)
 
-We use this plugin to fetch Open Graph data from a URL using OpenGraph.io.
+It works the same way for notes about papers, articles, and companies. Fetch once, and Bases, Dataview, or your published site can show the source properly.
 
-## Features
+## What's new in 0.2.0
 
-### Command: Fetch Open Graph Data
+- **The share image comes through.** Direct Fetch finds it in `og:image` (including its `:url` and `:secure_url` forms), `twitter:image`, schema.org microdata, `<link rel="image_src">`, and JSON-LD. It reads tags however the page writes them.
+- **Nothing gets erased.** If a page has no image, title, or description, your note keeps the one it had.
+- **Better authors, cleaner text.** Apostrophes and HTML entities come through intact. Bylines are found in JSON-LD and visible author lines, and reading times are no longer stored as authors. Bot-check pages count as a failed fetch.
+- **Searchable settings** on Obsidian 1.13's settings API.
+
+Full notes: [changelog/releases/0.2.0.md](changelog/releases/0.2.0.md).
+
+## Commands
+
+| Command | What it does | Needs |
+|---|---|---|
+| **Direct fetch from script** | Fetches the page itself and reads its Open Graph, Twitter, schema.org, and scholarly (`citation_*`) tags. | Nothing. No key, no rate limit. |
+| **Fetch via Microlink** | Same fields, through the Microlink API. | Nothing for about 50 requests a day; an optional key raises the limit. |
+| **Fetch from a frontmatter URL…** | Lists every URL in the note's frontmatter, under any property (`url`, `arxiv`, `doi`…), and fetches the one you pick with the provider you pick. | Depends on the provider. |
+| **Fetch Open Graph data for current file** | Opens a modal: overwrite or only fill in missing fields, record errors, update the fetch date. | An OpenGraph.io key. |
+| **Batch fetch Open Graph data** | Scans the current folder for notes with a URL and missing metadata, then processes them with a delay between requests. | An OpenGraph.io key. |
+
 ![Metafetch — Fetch Open Graph Data for Current File](https://github.com/user-attachments/assets/19ad9691-74d0-4b6e-b4ce-3abb3adea407)
 
-- Opens a modal where the user can configure:
-    - Whether to overwrite existing Open Graph data
-    - Whether to create new Open Graph data if missing
-    - Whether to write errors to YAML frontmatter
-    - Whether to update fetch date for processed files
-- Fetch Open Graph data from a URL using OpenGraph.io
-- See Progress and Status
-- Handle errors gracefully and display feedback
-- Returns Open Graph data to YAML frontmatter
+### What lands in frontmatter
 
-### Coming Soon:
+```yaml
+url: "https://arxiv.org/abs/2305.10601"
+og_title: "Tree of Thoughts: Deliberate Problem Solving with Large Language Models"
+og_description: "Language models are increasingly being deployed for general problem solving…"
+og_image: "https://arxiv.org/static/browse/0.3.4/images/arxiv-logo-fb.png"
+og_favicon: "https://arxiv.org/static/browse/0.3.4/images/icons/favicon-32x32.png"
+og_site_name: "arXiv.org"
+og_type: "website"
+authors:
+  - Shunyu Yao
+  - Dian Yu
+  - Jeffrey Zhao
+  - Izhak Shafran
+  - Thomas L. Griffiths
+  - Yuan Cao
+  - Karthik Narasimhan
+og_published: "2023-05-17"
+og_last_fetch: "2026-10-08T15:04:05.000Z"
+```
 
-#### Command: Batch Fetch Open Graph Data
+Every key name is configurable under **Settings → Metafetch → Field names**. An optional **vault identity code** (`hex_code: k4m2x9`) can be stamped on each fetched note, so you can reference it by something steadier than its filename.
 
-- Select multiple files to process at once
-- Pause and resume processing
-- Skip files with existing Open Graph data
-- Update fetch date for processed files
-- Write errors to YAML frontmatter
-- Configure delay between requests
+## Getting started
 
-# Getting Started as a User
+1. In **Settings → Community plugins**, search for "Metafetch", install it, and enable it.
+2. Add a `url:` property to a note.
+3. Open the command palette (`Cmd+P` / `Ctrl+P`) and run **Metafetch: Direct fetch from script**.
 
-1. Install the plugin from the Obsidian Plugin Marketplace.
+For the OpenGraph.io commands, add your key under **Settings → Metafetch → OpenGraph.io**. Free keys are available at [opengraph.io](https://www.opengraph.io/).
 
-2. In Community Plugins, search for "Metafetch" and install it.
-
-3. From the Settings tab, click on "Metafetch" and configure the settings.
-
-_This [Obsidian](https://obsidian.md/) plugin works for
- - [Microlink](https://microlink.io/)
- - [OpenGraph.io](https://opengraph.io/)_
 <a href="https://opengraph.io/"><img width="252" height="42" alt="trademark_OpenGraph-io" src="https://github.com/user-attachments/assets/08797db6-8fe7-4ced-a4fe-2ad4df79c26a" /></a>
 
-4. Get at least a Microlink or OpenGraph.io API key and add it to the settings. If you only have one, only the commands related to the one you add will work.
+Metafetch also works with [Microlink](https://microlink.io/).
 
-5. Open the Command Palette with `Command + P` (or `Control + P` on Windows & Linux) and type "Metafetch".
+## For developers
 
-6. Select "Fetch Open Graph Data for Current File".
-
-7. Magic!
-
-# Getting Started as a Developer from Open Source
-
-**Warning:** This is built assuming pnpm is your package manager. If you are using yarn or npm, you will need to modify the package.json file and may need to modify the code.
-
-Fork the repository, clone it to your local machine, and install dependencies:
-
-```
-pnpm install
-pnpm add -D esbuild @types/node builtin-modules
-pnpm build
-pnpm dev
-```
-
-## Packages, Dependencies, Libraries:
-
-```json
-	"devDependencies": {
-		"@types/node": "^24.0.12",
-		"@typescript-eslint/eslint-plugin": "8.36.0",
-		"@typescript-eslint/parser": "8.36.0",
-		"builtin-modules": "5.0.0",
-		"esbuild": "0.25.6",
-		"eslint": "^9.30.1",
-		"tslib": "2.8.1",
-		"typescript": "5.8.3"
-	},
-	"dependencies": {
-		"dev": "^0.1.3",
-		"obsidian": "latest",
-		"zod": "^4.0.0"
-	}
-```
-
-## Using Symbolic Links to Test Your Plugin
-
-If you're like us, you have a directory housing all your code projects. To use your plugin as you develop it, just create a symbolic link. Here is my example, but you will need to use your own path structure:
+Metafetch builds with [pnpm](https://pnpm.io/) and esbuild, and has no runtime dependencies.
 
 ```bash
-ln -s /Users/mpstaton/code/lossless-monorepo/obsidian-plugin-starter /Users/mpstaton/content-md/lossless/.obsidian/plugins/
+git clone https://github.com/lossless-group/metafetch.git
+cd metafetch
+pnpm install
+pnpm dev     # watch build to main.js
+pnpm test    # node:test suites, no framework
+pnpm lint    # the Obsidian review bot's rules (eslint-plugin-obsidianmd)
+pnpm build   # type-check + production bundle
 ```
 
-Once you symbolic link from your code to your Obsidian plugins directory, you can develop the plugin but you need to:
-1. Make sure it's built and running.
-2. Toggle the plugin on in Obsidian Settings: Community Plugins. 
+`pnpm-workspace.yaml` is this plugin's own pnpm settings file, so it installs and builds on its own even inside a larger checkout.
+
+To try a build in your vault, symlink the repo into the vault's plugin folder, then fully quit and reopen Obsidian (Obsidian reads `main.js` only at startup):
+
+```bash
+ln -s "$(pwd)" "<your-vault>/.obsidian/plugins/metafetch"
+```
+
+Releases are built and published by `.github/workflows/release.yml` when a version tag is pushed. The assets carry build-provenance attestations:
+
+```bash
+gh attestation verify main.js --repo lossless-group/metafetch
+```
+
+## License
+
+[The Unlicense](LICENSE). Made by [The Lossless Group](https://lossless.group).

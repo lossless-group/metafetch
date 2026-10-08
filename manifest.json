@@ -3,7 +3,7 @@
 	"name": "Metafetch",
 	"version": "0.2.0",
 	"minAppVersion": "1.13.0",
-	"description": "Pull OpenGraph metadata from any URL into note frontmatter — title, image, description, publisher — via OpenGraph.io or Microlink.",
+	"description": "Pull OpenGraph metadata from any URL into note frontmatter — title, image, description, publisher — directly, or via OpenGraph.io or Microlink.",
 	"author": "The Lossless Group",
 	"authorUrl": "https://lossless.group",
 	"fundingUrl": "https://coff.ee/losslessgroup",
