@@ -1,6 +1,6 @@
 // metafetch/src/settings/settings.ts
-import type { App } from 'obsidian';
-import { PluginSettingTab, Setting } from 'obsidian';
+import type { App, SettingDefinition, SettingDefinitionItem } from 'obsidian';
+import { PluginSettingTab } from 'obsidian';
 import type MetafetchPlugin from '../../main';
 
 export interface MetafetchSettings {
@@ -61,6 +61,32 @@ export const DEFAULT_SETTINGS: MetafetchSettings = {
     hexCodeLength: 6,
 };
 
+type SettingKey = keyof MetafetchSettings;
+
+function isSettingKey(key: string): key is SettingKey {
+    return Object.prototype.hasOwnProperty.call(DEFAULT_SETTINGS, key);
+}
+
+/** Frontmatter keys the fetchers write. An emptied one falls back to its default. */
+const FIELD_ROWS: Array<[name: string, desc: string, key: SettingKey]> = [
+    ['Title field', 'Open Graph title.', 'titleFieldName'],
+    ['Description field', 'Open Graph description.', 'descriptionFieldName'],
+    ['Image field', 'Open Graph image URL.', 'imageFieldName'],
+    ['Favicon field', 'Site favicon URL.', 'faviconFieldName'],
+    ['Site name field', 'Open Graph site_name (Microlink: publisher).', 'siteNameFieldName'],
+    ['Type field', 'Open Graph type, such as "article" or "website".', 'typeFieldName'],
+    ['Authors field', 'Article authors. Always written as a YAML list, one entry or many.', 'authorsFieldName'],
+    ['Published date field', 'Article publication date (Microlink: data.date).', 'publishedDateFieldName'],
+    ['Fetch date field', 'Timestamp of the last fetch.', 'fetchDateFieldName'],
+];
+
+const FIELD_NAME_KEYS = new Set<SettingKey>([...FIELD_ROWS.map(([, , key]) => key), 'hexCodeFieldName']);
+
+/**
+ * Declarative settings tab (Obsidian 1.13+). Obsidian renders these
+ * definitions and indexes every row for settings search; there is no
+ * display() override.
+ */
 export class MetafetchSettingTab extends PluginSettingTab {
     plugin: MetafetchPlugin;
 
@@ -69,214 +95,134 @@ export class MetafetchSettingTab extends PluginSettingTab {
         this.plugin = plugin;
     }
 
-    /**
-     * Build a collapsible <details> section. Each provider gets its own; all
-     * default-open for now since we have only a handful. Pass { open: false }
-     * once the list grows past ~3 to keep the panel scannable.
-     *
-     * Uses document.createElement instead of containerEl.createEl because
-     * Obsidian's typed createEl overloads for 'details'/'summary' do not
-     * accept cls/attr options under exactOptionalPropertyTypes.
-     */
-    private createSection(title: string, opts: { open?: boolean } = {}): HTMLElement {
-        const details = document.createElement('details');
-        details.className = 'metafetch-settings-section';
-        if (opts.open !== false) details.setAttribute('open', '');
-
-        const summary = document.createElement('summary');
-        summary.textContent = title;
-        summary.className = 'metafetch-settings-summary';
-        details.appendChild(summary);
-
-        this.containerEl.appendChild(details);
-        return details;
+    getControlValue(key: string): unknown {
+        return isSettingKey(key) ? this.plugin.settings[key] : undefined;
     }
 
-    display(): void {
-        const { containerEl } = this;
-        containerEl.empty();
+    async setControlValue(key: string, value: unknown): Promise<void> {
+        if (!isSettingKey(key)) return;
+        const settings = this.plugin.settings as unknown as Record<SettingKey, unknown>;
+        const fallback = DEFAULT_SETTINGS[key];
 
-        containerEl.createEl('h2', { text: 'Metafetch Settings' });
-
-        // ============================================================
-        // Provider: OpenGraph.io
-        // ============================================================
-        const ogIo = this.createSection('Provider: OpenGraph.io');
-
-        new Setting(ogIo)
-            .setName('OpenGraph.io API Key')
-            .setDesc('Required for the OpenGraph.io commands. Get a free key at https://www.opengraph.io/')
-            .addText(text => text
-                .setPlaceholder('Enter your API key')
-                .setValue(this.plugin.settings.apiKey)
-                .onChange(async (value) => {
-                    this.plugin.settings.apiKey = value;
-                    await this.plugin.saveSettings();
-                }));
-
-        new Setting(ogIo)
-            .setName('Base URL')
-            .setDesc('OpenGraph.io API base URL')
-            .addText(text => text
-                .setPlaceholder('https://api.opengraph.io')
-                .setValue(this.plugin.settings.baseUrl)
-                .onChange(async (value) => {
-                    this.plugin.settings.baseUrl = value;
-                    await this.plugin.saveSettings();
-                }));
-
-        new Setting(ogIo)
-            .setName('API URL')
-            .setDesc('OpenGraph.io API endpoint URL')
-            .addText(text => text
-                .setPlaceholder('https://opengraph.io/api/1.1/site')
-                .setValue(this.plugin.settings.apiUrl)
-                .onChange(async (value) => {
-                    this.plugin.settings.apiUrl = value;
-                    await this.plugin.saveSettings();
-                }));
-
-        new Setting(ogIo)
-            .setName('Retries')
-            .setDesc('Number of retry attempts for failed requests')
-            .addSlider(slider => slider
-                .setLimits(1, 10, 1)
-                .setValue(this.plugin.settings.retries)
-                .onChange(async (value: number) => {
-                    this.plugin.settings.retries = value;
-                    await this.plugin.saveSettings();
-                }));
-
-        new Setting(ogIo)
-            .setName('Rate Limit')
-            .setDesc('Maximum requests per minute')
-            .addSlider(slider => slider
-                .setLimits(10, 120, 10)
-                .setValue(this.plugin.settings.rateLimit)
-                .onChange(async (value: number) => {
-                    this.plugin.settings.rateLimit = value;
-                    await this.plugin.saveSettings();
-                }));
-
-        // ============================================================
-        // Provider: Microlink
-        // ============================================================
-        const micro = this.createSection('Provider: Microlink');
-
-        const microIntro = micro.createEl('p', {
-            text: 'The free tier allows ~50 requests/day per IP without a key. Add a key here only if you need higher limits.',
-        });
-        microIntro.addClass('setting-item-description');
-
-        new Setting(micro)
-            .setName('Microlink API Key (optional)')
-            .setDesc('Sent as the `x-api-key` header. Leave empty to use the anonymous free tier.')
-            .addText(text => text
-                .setPlaceholder('Optional — paste an API key from microlink.io')
-                .setValue(this.plugin.settings.microlinkApiKey)
-                .onChange(async (value) => {
-                    this.plugin.settings.microlinkApiKey = value;
-                    await this.plugin.saveSettings();
-                }));
-
-        // ============================================================
-        // Provider: Direct Fetch (no settings — informational)
-        // ============================================================
-        const direct = this.createSection('Provider: Direct Fetch');
-        const directIntro = direct.createEl('p', {
-            text: 'Fetches the page HTML directly via Obsidian\'s requestUrl and parses Open Graph / Twitter / <title> meta tags inline. No API key, no rate limits, no third party. Best when the page is server-rendered.',
-        });
-        directIntro.addClass('setting-item-description');
-
-        // ============================================================
-        // Field Name Mappings (shared by every fetcher)
-        // ============================================================
-        const fields = this.createSection('Field Name Mappings', { open: false });
-
-        const fieldsIntro = fields.createEl('p', {
-            text: 'Frontmatter keys written by every fetch command. Defaults follow the og_* convention.',
-        });
-        fieldsIntro.addClass('setting-item-description');
-
-        const fieldRows: Array<[label: string, desc: string, key: keyof MetafetchSettings, defaultPlaceholder: string]> = [
-            ['Title', 'Open Graph title', 'titleFieldName', 'og_title'],
-            ['Description', 'Open Graph description', 'descriptionFieldName', 'og_description'],
-            ['Image', 'Open Graph image URL', 'imageFieldName', 'og_image'],
-            ['Favicon', 'Site favicon / logo URL', 'faviconFieldName', 'og_favicon'],
-            ['Site Name', 'Open Graph site_name (Microlink: publisher)', 'siteNameFieldName', 'og_site_name'],
-            ['Type', 'Open Graph type (e.g. "article", "website")', 'typeFieldName', 'og_type'],
-            ['Authors', 'Article authors. Always written as a YAML array (one entry or many).', 'authorsFieldName', 'authors'],
-            ['Published Date', 'Article publication date (Microlink: data.date)', 'publishedDateFieldName', 'og_published'],
-            ['Fetch Date', 'Timestamp of the last fetch', 'fetchDateFieldName', 'og_last_fetch'],
-        ];
-
-        for (const [label, desc, key, placeholder] of fieldRows) {
-            new Setting(fields)
-                .setName(`${label} field`)
-                .setDesc(desc)
-                .addText(text => text
-                    .setPlaceholder(placeholder)
-                    .setValue(this.plugin.settings[key] as string)
-                    .onChange(async (value) => {
-                        // never write an empty key — fall back to the default
-                        (this.plugin.settings[key] as any) = value || placeholder;
-                        await this.plugin.saveSettings();
-                    }));
+        if (typeof fallback === 'number') {
+            if (typeof value !== 'number' || !Number.isFinite(value)) return;
+            settings[key] = value;
+        } else if (typeof fallback === 'boolean') {
+            settings[key] = value === true;
+        } else {
+            const text = typeof value === 'string' ? value : '';
+            // Never write an empty frontmatter key: fall back to the default.
+            settings[key] = FIELD_NAME_KEYS.has(key) ? (text.trim() || fallback) : text;
         }
+        await this.plugin.saveSettings();
+        // The key-status rows' `visible` predicates depend on the key.
+        // refreshDomState() toggles them in place, so typing keeps focus.
+        if (key === 'apiKey') this.refreshDomState();
+    }
 
-        // ============================================================
-        // Vault identity code
-        // ============================================================
-        const identity = this.createSection('Vault Identity Code', { open: false });
-        const identityIntro = identity.createEl('p', {
-            text: 'Mint a short, vault-unique code on each fetched note so it can be referenced from anywhere by something stabler than its filename. Written once — an existing code is never overwritten or regenerated.',
-        });
-        identityIntro.addClass('setting-item-description');
+    getSettingDefinitions(): SettingDefinitionItem[] {
+        const hasApiKey = () => this.plugin.settings.apiKey.trim().length > 0;
+        const fieldRows: SettingDefinition[] = FIELD_ROWS.map(([name, desc, key]) => ({
+            name,
+            desc,
+            control: { type: 'text', key, placeholder: String(DEFAULT_SETTINGS[key]) },
+        }));
 
-        new Setting(identity)
-            .setName('Stamp an identity code')
-            .setDesc('Off by default: this writes a property the note did not ask for.')
-            .addToggle(toggle => toggle
-                .setValue(this.plugin.settings.stampHexCode)
-                .onChange(async (value) => {
-                    this.plugin.settings.stampHexCode = value;
-                    await this.plugin.saveSettings();
-                }));
-
-        new Setting(identity)
-            .setName('Identity code field')
-            .setDesc('Frontmatter key that holds the code.')
-            .addText(text => text
-                .setPlaceholder('hex_code')
-                .setValue(this.plugin.settings.hexCodeFieldName)
-                .onChange(async (value) => {
-                    this.plugin.settings.hexCodeFieldName = value || 'hex_code';
-                    await this.plugin.saveSettings();
-                }));
-
-        new Setting(identity)
-            .setName('Code length')
-            .setDesc('Characters drawn from a-z0-9 — 36 possibilities each, not 16. Despite the "hex" name these are not hexadecimal: the wider alphabet costs the same on disk and makes collisions far less likely (6 chars gives 2.18 billion combinations, versus 16.7 million for true hex).')
-            // No .setDynamicTooltip(): the repo's obsidian.d.ts augmentation
-            // types addSlider's argument as Setting rather than SliderComponent.
-            // Worth fixing with that shim, not around it.
-            .addSlider(slider => slider
-                .setLimits(4, 12, 1)
-                .setValue(this.plugin.settings.hexCodeLength)
-                .onChange(async (value: number) => {
-                    this.plugin.settings.hexCodeLength = value;
-                    await this.plugin.saveSettings();
-                }));
-
-        // ============================================================
-        // Status
-        // ============================================================
-        const statusEl = containerEl.createEl('div', {
-            text: this.plugin.settings.apiKey
-                ? 'OpenGraph.io API key configured'
-                : 'OpenGraph.io API key missing — that provider will not work. Microlink (anonymous) and Direct Fetch are unaffected.',
-        });
-        statusEl.addClass('setting-item-description');
-        if (!this.plugin.settings.apiKey) statusEl.addClass('setting-item-warning');
+        return [
+            {
+                type: 'group',
+                heading: 'OpenGraph.io',
+                items: [
+                    {
+                        name: 'OpenGraph.io API key',
+                        desc: 'Required for the OpenGraph.io commands. Get a free key at https://www.opengraph.io/',
+                        control: { type: 'text', key: 'apiKey', placeholder: 'Enter your API key' },
+                    },
+                    {
+                        name: 'API key status',
+                        desc: 'OpenGraph.io API key configured.',
+                        visible: hasApiKey,
+                    },
+                    {
+                        name: 'API key status',
+                        desc: 'OpenGraph.io API key missing, so that provider will not work. Microlink and Direct Fetch are unaffected.',
+                        visible: () => !hasApiKey(),
+                    },
+                    {
+                        name: 'Base URL',
+                        desc: 'OpenGraph.io API base URL.',
+                        control: { type: 'text', key: 'baseUrl', placeholder: DEFAULT_SETTINGS.baseUrl },
+                    },
+                    {
+                        name: 'API URL',
+                        desc: 'OpenGraph.io API endpoint URL.',
+                        control: { type: 'text', key: 'apiUrl', placeholder: DEFAULT_SETTINGS.apiUrl },
+                    },
+                    {
+                        name: 'Retries',
+                        desc: 'Number of retry attempts for failed requests.',
+                        control: { type: 'slider', key: 'retries', min: 1, max: 10, step: 1 },
+                    },
+                    {
+                        name: 'Rate limit',
+                        desc: 'Maximum requests per minute.',
+                        control: { type: 'slider', key: 'rateLimit', min: 10, max: 120, step: 10 },
+                    },
+                ],
+            },
+            {
+                type: 'group',
+                heading: 'Microlink',
+                items: [
+                    {
+                        name: 'Microlink API key (optional)',
+                        desc: 'The free tier allows about 50 requests a day per IP without a key. A key, sent as the x-api-key header, raises the limit.',
+                        control: { type: 'text', key: 'microlinkApiKey', placeholder: 'Optional: an API key from microlink.io' },
+                    },
+                ],
+            },
+            {
+                type: 'group',
+                heading: 'Direct fetch',
+                items: [
+                    {
+                        name: 'How Direct Fetch works',
+                        desc: 'Fetches the page HTML through Obsidian and reads its Open Graph, Twitter, schema.org, and <title> tags. No API key, no rate limits, no third party. Best when the page is server-rendered. It has no settings.',
+                    },
+                ],
+            },
+            {
+                type: 'group',
+                heading: 'Field names',
+                items: [
+                    {
+                        name: 'Frontmatter keys',
+                        desc: 'The properties every fetch command writes. Defaults follow the og_* convention.',
+                    },
+                    ...fieldRows,
+                ],
+            },
+            {
+                type: 'group',
+                heading: 'Vault identity code',
+                items: [
+                    {
+                        name: 'Stamp an identity code',
+                        desc: 'Mint a short, vault-unique code on each fetched note, so it can be referenced by something steadier than its filename. Written once: an existing code is never overwritten. Off by default, because it writes a property the note did not ask for.',
+                        control: { type: 'toggle', key: 'stampHexCode' },
+                    },
+                    {
+                        name: 'Identity code field',
+                        desc: 'Frontmatter key that holds the code.',
+                        control: { type: 'text', key: 'hexCodeFieldName', placeholder: DEFAULT_SETTINGS.hexCodeFieldName },
+                    },
+                    {
+                        name: 'Code length',
+                        desc: 'Characters drawn from a-z and 0-9: 36 possibilities each, not 16. Despite the "hex" name these are not hexadecimal. The wider alphabet costs the same on disk and makes collisions far less likely: 6 characters give 2.18 billion combinations, against 16.7 million for true hex.',
+                        control: { type: 'slider', key: 'hexCodeLength', min: 4, max: 12, step: 1 },
+                    },
+                ],
+            },
+        ];
     }
 }

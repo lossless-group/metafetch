@@ -41,7 +41,8 @@ export default class MetafetchPlugin extends Plugin {
     }
 
     async loadSettings(): Promise<void> {
-        this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+        // A clone, so editing settings can never mutate DEFAULT_SETTINGS.
+        this.settings = Object.assign(structuredClone(DEFAULT_SETTINGS), await this.loadData() as Partial<MetafetchSettings> | null);
     }
 
     async saveSettings(): Promise<void> {
