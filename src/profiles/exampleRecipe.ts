@@ -27,7 +27,7 @@ How a recipe works:
 - \`response.text\` is the path to the reply's text. \`[0]\` indexes a list, and \`[?type=text]\` takes the first item whose \`type\` is \`text\`.
 - \`enforces-schema: true\` says the API holds the reply to the schema. Otherwise the prompt asks for JSON, and Metafetch reads the first JSON object in the reply.
 
-\`\`\`metafetch-recipe
+\`\`\`cf-recipe
 id: gemini
 title: Google Gemini
 description: Google's Gemini API (example recipe).

@@ -4,7 +4,7 @@
 // how, what the body looks like, and where the reply's text is. Claude,
 // OpenAI, TrustedRouter, and any OpenAI-compatible endpoint ship as bundled
 // recipes; anything else is a recipe file in the vault
-// (zz-cf-lib/recipes/*.md, in a `metafetch-recipe` block).
+// (zz-cf-lib/recipes/*.md, in a `cf-recipe` block).
 //
 // Recipes are data, never code: the only computation is substituting
 // {{variables}} into the body and reading one path out of the response.
@@ -160,7 +160,7 @@ export const BUNDLED_RECIPES: ModelRecipe[] = [
 
 // --- Vault recipes ---------------------------------------------------------
 
-const FENCE_OPEN = /^```metafetch-recipe\s*$/;
+const FENCE_OPEN = /^```cf-recipe\s*$/;
 const FENCE_CLOSE = /^```\s*$/;
 
 function asRecord(v: unknown): Record<string, unknown> | null {
@@ -175,7 +175,7 @@ export function parseRecipe(content: string, path: string): { recipe: ModelRecip
   const open = lines.findIndex(l => FENCE_OPEN.test(l));
   if (open < 0) return null;
   const close = lines.findIndex((l, i) => i > open && FENCE_CLOSE.test(l));
-  if (close < 0) return { recipe: null, problems: ['the metafetch-recipe block is never closed'] };
+  if (close < 0) return { recipe: null, problems: ['the cf-recipe block is never closed'] };
 
   let config: Record<string, unknown> | null;
   try {
@@ -183,7 +183,7 @@ export function parseRecipe(content: string, path: string): { recipe: ModelRecip
   } catch {
     config = null;
   }
-  if (!config) return { recipe: null, problems: ['the metafetch-recipe block is not valid YAML'] };
+  if (!config) return { recipe: null, problems: ['the cf-recipe block is not valid YAML'] };
 
   const problems: string[] = [];
   const basename = path.split('/').pop()?.replace(/\.md$/, '') ?? path;

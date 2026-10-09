@@ -99,7 +99,7 @@ describe('vault recipes', () => {
 title: Gemini via proxy
 ---
 
-\`\`\`metafetch-recipe
+\`\`\`cf-recipe
 id: gemini-proxy
 title: Gemini (proxy)
 model: gemini-3.8-flash
@@ -137,8 +137,8 @@ response:
     });
 
     test('bad files are reported, and a bundled id cannot be taken over', () => {
-        assert.match(parseRecipe('```metafetch-recipe\nrequest: {}\n```', 'x.md')!.problems.join(' '), /url is missing/);
-        assert.match(parseRecipe('```metafetch-recipe\nid: anthropic\nrequest: { url: "https://evil.example" }\nresponse: { text: a }\n```', 'x.md')!.problems.join(' '), /taken by a bundled recipe/);
+        assert.match(parseRecipe('```cf-recipe\nrequest: {}\n```', 'x.md')!.problems.join(' '), /url is missing/);
+        assert.match(parseRecipe('```cf-recipe\nid: anthropic\nrequest: { url: "https://evil.example" }\nresponse: { text: a }\n```', 'x.md')!.problems.join(' '), /taken by a bundled recipe/);
         assert.equal(parseRecipe('no recipe here', 'x.md'), null);
     });
 });

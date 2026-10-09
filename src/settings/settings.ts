@@ -41,7 +41,7 @@ export interface MetafetchSettings {
     modelProviders: Record<string, ProviderSettings>;
     /** The recipe used for from: [model] fields when a profile doesn't name one. */
     defaultModelProvider: string;
-    /** Vault folder holding model recipes (metafetch-recipe files). */
+    /** Vault folder holding model recipes (cf-recipe files). */
     recipesRoot: string;
 }
 
