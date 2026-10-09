@@ -163,13 +163,17 @@ describe('control bindings', () => {
         const keys = walk(makeTab().tab.getSettingDefinitions())
             .map(d => d.control?.key)
             .filter((k): k is string => !!k);
+        // Provider rows are nested (modelProviders.<id>.<field>); count them
+        // under their top-level key.
+        const topLevel = [...new Set(keys.map(k => k.split('.')[0] ?? k))];
         const expected = Object.keys(DEFAULT_SETTINGS).filter(k => !UNEXPOSED_KEYS.includes(k));
-        assert.deepEqual([...keys].sort(), expected.sort());
+        assert.deepEqual(topLevel.sort(), expected.sort());
+        for (const k of keys) assert.ok(k.split('.')[0]! in DEFAULT_SETTINGS, k);
     });
 
     test('getControlValue reads the stored value for every control', () => {
         const { tab, settings } = makeTab({ apiKey: 'og_test', imageFieldName: 'cover', hexCodeLength: 8, stampHexCode: true });
-        for (const k of Object.keys(DEFAULT_SETTINGS) as (keyof MetafetchSettings)[]) {
+        for (const k of (Object.keys(DEFAULT_SETTINGS) as (keyof MetafetchSettings)[]).filter(k => k !== 'modelProviders')) {
             assert.deepEqual(tab.getControlValue(k), settings[k], k);
         }
     });
@@ -200,5 +204,35 @@ describe('control bindings', () => {
         await tab.setControlValue('notASetting', 'x');
         assert.equal((settings as unknown as Record<string, unknown>)['notASetting'], undefined);
         assert.equal(saves(), 0);
+    });
+});
+
+describe('model provider rows', () => {
+    test('every bundled provider gets a group with a key row and a model row', () => {
+        const defs = walk(makeTab().tab.getSettingDefinitions());
+        for (const heading of ['Model providers', 'Claude (Anthropic)', 'OpenAI', 'TrustedRouter', 'OpenAI-compatible endpoint']) {
+            const group = defs.find(d => d.type === 'group' && d.heading === heading);
+            assert.ok(group, `missing group ${heading}`);
+            if (heading === 'Model providers') continue;
+            const names = (group.items ?? []).map(i => i.name);
+            assert.ok(names.includes('API key') && names.includes('Model'), `${heading}: ${names.join(', ')}`);
+        }
+        const compatible = defs.find(d => d.heading === 'OpenAI-compatible endpoint');
+        assert.ok(compatible?.items?.some(i => i.name === 'Base URL'));
+    });
+
+    test('nested provider settings read and write through the control keys', async () => {
+        const { tab, settings, saves } = makeTab();
+        assert.equal(tab.getControlValue('modelProviders.anthropic.model'), 'claude-opus-5-5');
+        await tab.setControlValue('modelProviders.openai.model', ' gpt-6.1-sol ');
+        assert.equal(settings.modelProviders['openai']?.model, 'gpt-6.1-sol');
+        await tab.setControlValue('modelProviders.anthropic.secret', 'leaked-into-settings');
+        assert.equal(settings.modelProviders['anthropic']?.secret, '', 'the secret name is set only by the keychain row, never a text control');
+        assert.equal(saves(), 1);
+    });
+
+    test('the default provider dropdown lists every recipe', () => {
+        const dd = walk(makeTab().tab.getSettingDefinitions()).find(d => d.control?.key === 'defaultModelProvider');
+        assert.equal(dd?.control?.type, 'dropdown');
     });
 });

@@ -18,7 +18,7 @@ interface StubPlugin {
     onload(): Promise<void>;
 }
 
-// Every command ID: the five from 0.1.7, plus the folder-profile pair.
+// Every command ID: the five from 0.1.7, plus the folder-profile and recipe commands.
 // IDs are what user hotkeys bind to, so they must not change.
 const COMMAND_IDS = [
     'fetch-opengraph-data',
@@ -28,10 +28,11 @@ const COMMAND_IDS = [
     'fetch-from-frontmatter-url',
     'fill-from-folder-profile',
     'create-example-frontmatter-profile',
+    'create-example-model-recipe',
 ];
 
 function makePlugin(storedData: unknown = null): StubPlugin {
-    const app = { workspace: {}, vault: {}, metadataCache: {}, fileManager: {} };
+    const app = { workspace: { onLayoutReady: (cb: () => void) => cb() }, vault: { getMarkdownFiles: () => [] }, metadataCache: {}, fileManager: {} };
     const manifest = { id: 'metafetch', name: 'Metafetch', version: '0.0.0' };
     const Ctor = MetafetchPlugin as unknown as new (app: unknown, manifest: unknown) => StubPlugin;
     const plugin = new Ctor(app, manifest);

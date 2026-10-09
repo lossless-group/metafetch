@@ -4,7 +4,9 @@
 
 import { Notice, normalizePath, TFile, TFolder } from 'obsidian';
 import type { App } from 'obsidian';
-import { fetchPageHtml, isJunkTitle, parseDirectFetchHtml, parseOrReject } from '../services/directFetchService';
+import { fetchPageHtml, htmlToText, isJunkTitle, parseDirectFetchHtml, parseOrReject } from '../services/directFetchService';
+import { callModel, parseRecipe, ModelCallError, type ModelRecipe, type ProviderSettings } from '../services/modelRecipes';
+import { providerSettings } from '../services/modelProviderSettings';
 import { chooseSocialLinks } from '../services/socialLinks';
 import {
   needsSocials,
@@ -12,14 +14,43 @@ import {
   planFill,
   resolveProfiles,
   fieldIsSet,
+  modelSchema,
+  modelPrompt,
+  acceptModelValue,
   type FillReport,
   type FrontmatterProfile,
 } from '../services/frontmatterProfiles';
 import type { OpenGraphData } from '../types/open-graph-service';
 import { extractFrontmatter } from '../utils/yamlFrontmatter';
 import { TOOLING_SOCIALS_FILENAME, TOOLING_SOCIALS_PROFILE } from '../profiles/toolingSocials';
+import { EXAMPLE_RECIPE, EXAMPLE_RECIPE_FILENAME } from '../profiles/exampleRecipe';
 
 export type ProfilePicker = (profiles: FrontmatterProfile[]) => Promise<FrontmatterProfile | null>;
+
+export interface FillOptions {
+  profilesRoot: string;
+  /** Bundled and vault model recipes. */
+  recipes: ModelRecipe[];
+  providers: Record<string, ProviderSettings>;
+  defaultModelProvider: string;
+  /** Reads a secret by name: app.secretStorage.getSecret in the app. */
+  getSecret: (name: string) => string | null;
+}
+
+/** Every recipe under the recipes folder, plus problems per file. */
+export async function listVaultRecipes(app: App, root: string): Promise<{ recipes: ModelRecipe[]; problems: string[] }> {
+  const prefix = normalizePath(root).replace(/\/$/, '') + '/';
+  const recipes: ModelRecipe[] = [];
+  const problems: string[] = [];
+  for (const file of app.vault.getMarkdownFiles()) {
+    if (!file.path.startsWith(prefix)) continue;
+    const parsed = parseRecipe(await app.vault.cachedRead(file), file.path);
+    if (!parsed) continue;
+    if (parsed.recipe && !recipes.some(r => r.id === parsed.recipe?.id)) recipes.push(parsed.recipe);
+    for (const p of parsed.problems) problems.push(`${file.path}: ${p}`);
+  }
+  return { recipes, problems };
+}
 
 /** Every profile under the profiles folder. Files without a metafetch-profile block are ignored. */
 export async function listProfiles(app: App, root: string): Promise<FrontmatterProfile[]> {
@@ -52,6 +83,7 @@ function summarize(profile: FrontmatterProfile, report: FillReport): string {
   }
   if (report.notFound.length) parts.push(`Not found: ${report.notFound.join(', ')}.`);
   if (report.skipped.length) parts.push(`Skipped (needs a provider this version lacks): ${report.skipped.join(', ')}.`);
+  if (report.forModel.length) parts.push(`Not filled by the model: ${report.forModel.join(', ')}.`);
   return parts.join(' ');
 }
 
@@ -63,7 +95,8 @@ async function tryFetch(url: string): Promise<{ html: string } | { error: string
   }
 }
 
-export async function fillFromProfile(app: App, profilesRoot: string, pick: ProfilePicker): Promise<void> {
+export async function fillFromProfile(app: App, options: FillOptions, pick: ProfilePicker): Promise<void> {
+  const { profilesRoot } = options;
   const file = app.workspace.getActiveFile();
   if (!(file instanceof TFile)) {
     new Notice('Metafetch: no active file');
@@ -129,6 +162,47 @@ export async function fillFromProfile(app: App, profilesRoot: string, pick: Prof
   }
 
   const { values, report } = planFill(profile, fm, page, socials);
+
+  // Fields left for a model: one call per note, reading the page's text. No
+  // page text, no call: a model asked about a page it can't see will guess.
+  let modelNote = '';
+  if (report.forModel.length > 0) {
+    const fields = profile.fields.filter(f => report.forModel.includes(f.key));
+    const recipeId = profile.modelProvider || options.defaultModelProvider;
+    const recipe = options.recipes.find(r => r.id === recipeId);
+    const html = 'html' in pageFetch && page ? pageFetch.html : null;
+    if (!recipe) {
+      modelNote = ` Model step skipped: no recipe named "${recipeId}".`;
+    } else if (!html) {
+      modelNote = ' Model step skipped: the page could not be read.';
+    } else {
+      const thinking = new Notice(`Metafetch (${profile.title}): asking ${recipe.title}…`, 0);
+      try {
+        const title = typeof fm['title'] === 'string' ? fm['title'] : file.basename;
+        const { system, prompt } = modelPrompt(fields, { title, url, frontmatter: fm }, htmlToText(html));
+        const reply = await callModel({
+          recipe,
+          provider: providerSettings(options.providers, recipe),
+          getSecret: options.getSecret,
+          system,
+          prompt,
+          schema: modelSchema(fields),
+        });
+        for (const field of fields) {
+          const v = acceptModelValue(field, reply.values[field.key]);
+          if (v === undefined) continue;
+          values[field.key] = v;
+          report.filled.push(field.key);
+          report.forModel = report.forModel.filter(k => k !== field.key);
+        }
+        modelNote = ` (${recipe.title}, ${reply.model})`;
+      } catch (err) {
+        modelNote = ` Model step failed: ${err instanceof ModelCallError || err instanceof Error ? err.message : 'unknown error'}`;
+      } finally {
+        thinking.hide();
+      }
+    }
+  }
   if (report.filled.length > 0) {
     // processFrontMatter adds the new keys and leaves every other line of the
     // note's frontmatter as it was; rewriting the whole block would re-quote
@@ -142,14 +216,23 @@ export async function fillFromProfile(app: App, profilesRoot: string, pick: Prof
       }
     });
   }
-  new Notice(summarize(profile, report), 12000);
+  new Notice(summarize(profile, report) + modelNote, 15000);
   for (const a of report.ambiguous) console.debug(`Metafetch: ${file.path} ${a.key} candidates:`, a.candidates);
 }
 
 /** Writes the Tooling socials example into the profiles folder, unless it's already there. */
 export async function createExampleProfile(app: App, profilesRoot: string): Promise<void> {
-  const root = normalizePath(profilesRoot);
-  const path = normalizePath(`${root}/${TOOLING_SOCIALS_FILENAME}`);
+  await writeExample(app, profilesRoot, TOOLING_SOCIALS_FILENAME, TOOLING_SOCIALS_PROFILE, 'Edit its fields block to change what Tooling notes get.');
+}
+
+/** Writes the example model recipe into the recipes folder, unless it's already there. */
+export async function createExampleRecipe(app: App, recipesRoot: string): Promise<void> {
+  await writeExample(app, recipesRoot, EXAMPLE_RECIPE_FILENAME, EXAMPLE_RECIPE, 'Open it for the steps to turn it on.');
+}
+
+async function writeExample(app: App, folder: string, filename: string, content: string, next: string): Promise<void> {
+  const root = normalizePath(folder);
+  const path = normalizePath(`${root}/${filename}`);
   const existing = app.vault.getAbstractFileByPath(path);
   if (existing instanceof TFile) {
     new Notice(`Metafetch: ${path} already exists; it was left as is.`);
@@ -158,6 +241,6 @@ export async function createExampleProfile(app: App, profilesRoot: string): Prom
   if (!(app.vault.getAbstractFileByPath(root) instanceof TFolder)) {
     await app.vault.createFolder(root);
   }
-  await app.vault.create(path, TOOLING_SOCIALS_PROFILE);
-  new Notice(`Metafetch: created ${path}. Edit its fields block to change what Tooling notes get.`);
+  await app.vault.create(path, content);
+  new Notice(`Metafetch: created ${path}. ${next}`);
 }

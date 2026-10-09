@@ -4,12 +4,23 @@
 import { test, describe, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { TFile, TFolder, Notice } from 'obsidian';
-import { fillFromProfile, createExampleProfile, siteRoot } from '../src/commands/fillFromProfile';
+import { fillFromProfile as fill, createExampleProfile, siteRoot, type FillOptions } from '../src/commands/fillFromProfile';
+import { BUNDLED_RECIPES } from '../src/services/modelRecipes';
+import { defaultProviderSettings } from '../src/services/modelProviderSettings';
 import { TOOLING_SOCIALS_PROFILE } from '../src/profiles/toolingSocials';
 import type { App } from 'obsidian';
 import { extractFrontmatter, withFrontmatter } from '../src/utils/yamlFrontmatter';
 
 const ROOT = 'zz-cf-lib/frontmatter';
+
+const OPTIONS: FillOptions = {
+    profilesRoot: ROOT,
+    recipes: BUNDLED_RECIPES,
+    providers: defaultProviderSettings(),
+    defaultModelProvider: 'anthropic',
+    getSecret: () => null,
+};
+const fillFromProfile = (app: App, _root: string, pick: () => Promise<null>) => fill(app, OPTIONS, pick);
 
 interface FakeFile { path: string; parent: { path: string } }
 
@@ -158,4 +169,54 @@ test('a blocked homepage contributes no socials, even when the deep page was rea
     assert.equal(line(files['Tooling/D.md']!, 'x_url'), undefined);
     assert.equal(line(files['Tooling/D.md']!, 'og_image'), 'og_image: "https://deep.example/card.png"');
     delete (globalThis as { __requestUrl?: unknown }).__requestUrl;
+});
+
+describe('the model step', () => {
+    const PROFILE = `---
+applies-to-paths: ["Tooling/**"]
+---
+\`\`\`metafetch-profile
+fields:
+  x_url: { platform: x }
+  zinger: { from: [model], describe: "One punchy line about what it does." }
+  pricing_model: { from: [model], type: enum, values: [free, freemium, paid], describe: "How it charges." }
+\`\`\`
+`;
+    afterEach(() => { delete (globalThis as { __requestUrl?: unknown }).__requestUrl; Notice.shown.length = 0; });
+
+    function serve(home: string, modelReply: unknown): { modelRequests: { url: string; body?: string; headers?: Record<string, string> }[] } {
+        const modelRequests: { url: string; body?: string; headers?: Record<string, string> }[] = [];
+        (globalThis as { __requestUrl?: unknown }).__requestUrl = (req: { url: string; body?: string; headers?: Record<string, string> }) => {
+            if (req.url.startsWith('https://api.anthropic.com/')) {
+                modelRequests.push(req);
+                return { status: 200, headers: {}, text: JSON.stringify(modelReply), json: modelReply, arrayBuffer: new ArrayBuffer(0) };
+            }
+            return { status: 200, headers: { 'content-type': 'text/html' }, text: home, json: null, arrayBuffer: new ArrayBuffer(0) };
+        };
+        return { modelRequests };
+    }
+
+    test('fills model fields from the page text, after the free parse, with the key from the keychain', async () => {
+        const { app, files } = makeVault({ [`${ROOT}/p.md`]: PROFILE, 'Tooling/T.md': '---\nurl: "https://tina.io/"\n---\n' }, 'Tooling/T.md');
+        const { modelRequests } = serve(TINA_HOME, { content: [{ type: 'text', text: '{"zinger":"Git-backed CMS for Markdown sites.","pricing_model":"enterprise"}' }] });
+        await fill(app, { ...OPTIONS, providers: { ...OPTIONS.providers, anthropic: { secret: 'anthropic', model: '', baseUrl: '', approvedHosts: '' } }, getSecret: n => (n === 'anthropic' ? 'sk-ant' : null) }, noPick);
+
+        const note = files['Tooling/T.md']!;
+        assert.equal(line(note, 'x_url'), 'x_url: "https://x.com/tinacms"', 'the free parse still runs first');
+        assert.equal(line(note, 'zinger'), 'zinger: "Git-backed CMS for Markdown sites."');
+        assert.equal(line(note, 'pricing_model'), undefined, '"enterprise" is not an allowed value');
+        assert.equal(modelRequests.length, 1, 'one call per note');
+        assert.equal(modelRequests[0]?.headers?.['x-api-key'], 'sk-ant');
+        assert.match(modelRequests[0]?.body ?? '', /<page>/);
+        assert.match(Notice.shown.at(-1) ?? '', /Claude \(Anthropic\), claude-opus-5-5/);
+    });
+
+    test('no key: the free fields are still written, and the notice says why the model step stopped', async () => {
+        const { app, files } = makeVault({ [`${ROOT}/p.md`]: PROFILE, 'Tooling/T.md': '---\nurl: "https://tina.io/"\n---\n' }, 'Tooling/T.md');
+        const { modelRequests } = serve(TINA_HOME, {});
+        await fill(app, OPTIONS, noPick);
+        assert.equal(modelRequests.length, 0);
+        assert.equal(line(files['Tooling/T.md']!, 'x_url'), 'x_url: "https://x.com/tinacms"');
+        assert.match(Notice.shown.at(-1) ?? '', /Model step failed: .*no API key/);
+    });
 });

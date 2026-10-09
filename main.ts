@@ -11,7 +11,9 @@ import { collectFrontmatterUrls } from './src/utils/frontmatterUrls';
 import { SelectUrlModal } from './src/modals/SelectUrlModal';
 import type { FetchProvider } from './src/modals/SelectUrlModal';
 import { stampIdentityCode } from './src/utils/hexCode';
-import { createExampleProfile, fillFromProfile } from './src/commands/fillFromProfile';
+import { createExampleProfile, createExampleRecipe, fillFromProfile, listVaultRecipes } from './src/commands/fillFromProfile';
+import { BUNDLED_RECIPES, type ModelRecipe } from './src/services/modelRecipes';
+import { mergeProviderSettings } from './src/services/modelProviderSettings';
 import { SelectProfileModal } from './src/modals/SelectProfileModal';
 import type { FrontmatterProfile } from './src/services/frontmatterProfiles';
 
@@ -22,6 +24,9 @@ export default class MetafetchPlugin extends Plugin {
     // emits a real field declaration that would clobber the base with
     // `undefined` at construction.
     declare settings: MetafetchSettings;
+
+    /** Bundled model recipes, then any found in the recipes folder. */
+    recipes: ModelRecipe[] = [...BUNDLED_RECIPES];
 
     async onload(): Promise<void> {
         await this.loadSettings();
@@ -41,11 +46,25 @@ export default class MetafetchPlugin extends Plugin {
 
         // Register commands
         this.registerCommands();
+
+        // Vault recipes are vault files, readable once the vault has indexed.
+        this.app.workspace.onLayoutReady(() => { void this.loadRecipes(); });
     }
 
     async loadSettings(): Promise<void> {
         // A clone, so editing settings can never mutate DEFAULT_SETTINGS.
-        this.settings = Object.assign(structuredClone(DEFAULT_SETTINGS), await this.loadData() as Partial<MetafetchSettings> | null);
+        const saved = await this.loadData() as Partial<MetafetchSettings> | null;
+        this.settings = Object.assign(structuredClone(DEFAULT_SETTINGS), saved);
+        // Nested, so merged per provider: a recipe added in a later version
+        // gets its defaults even when data.json predates it.
+        this.settings.modelProviders = mergeProviderSettings(saved?.modelProviders);
+    }
+
+    /** Re-reads the recipes folder. Problems are logged, not fatal. */
+    async loadRecipes(): Promise<void> {
+        const { recipes, problems } = await listVaultRecipes(this.app, this.settings.recipesRoot);
+        this.recipes = [...BUNDLED_RECIPES, ...recipes];
+        for (const p of problems) console.warn(`Metafetch recipe: ${p}`);
     }
 
     async saveSettings(): Promise<void> {
@@ -107,7 +126,21 @@ export default class MetafetchPlugin extends Plugin {
             id: 'fill-from-folder-profile',
             name: 'Fill frontmatter from folder profile',
             editorCallback: (_editor: Editor) => {
-                void fillFromProfile(this.app, this.settings.profilesRoot, profiles => this.pickProfile(profiles));
+                void this.loadRecipes().then(() => fillFromProfile(this.app, {
+                    profilesRoot: this.settings.profilesRoot,
+                    recipes: this.recipes,
+                    providers: this.settings.modelProviders,
+                    defaultModelProvider: this.settings.defaultModelProvider,
+                    getSecret: name => this.app.secretStorage.getSecret(name),
+                }, profiles => this.pickProfile(profiles)));
+            }
+        });
+
+        this.addCommand({
+            id: 'create-example-model-recipe',
+            name: 'Create example model recipe',
+            callback: () => {
+                void createExampleRecipe(this.app, this.settings.recipesRoot).then(() => this.loadRecipes());
             }
         });
 

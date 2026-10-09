@@ -12,9 +12,10 @@
 //   ```
 //
 // `platform:` fields are filled from the site's own social links;
-// `page:` fields from the page's metadata. Only the direct parser exists in
-// this version, so a field whose `from:` list excludes `direct` is skipped
-// and reported. See context-v/explorations/Folder-Aware-Frontmatter-
+// `page:` fields from the page's metadata; fields with `from: [model]` and a
+// `describe:` instruction by a model reading the page's text (see
+// modelRecipes.ts). Social links and other URLs are never asked of a model,
+// which would make them up. See context-v/explorations/Folder-Aware-Frontmatter-
 // Templates-and-Fetch-Recipes.md.
 
 import { parseYaml } from 'obsidian';
@@ -35,8 +36,18 @@ export interface ProfileField {
   page?: PageValue;
   /** Other keys that, when set, mean this field is already filled. Never renamed. */
   aliases: string[];
-  /** False when `from:` lists no source this version can run. */
+  /** The direct parser may fill it (it has a platform or page value, and `from` allows `direct`). */
   runnable: boolean;
+  /** A model may fill it, when the direct parser didn't. */
+  model?: ModelFieldSpec;
+}
+
+export interface ModelFieldSpec {
+  /** The instruction the model gets for this field. */
+  describe: string;
+  type: 'string' | 'enum' | 'list';
+  /** Allowed values, for `enum` (one) and `list` (any of; empty means free text). */
+  values: string[];
 }
 
 export interface FrontmatterProfile {
@@ -45,6 +56,8 @@ export interface FrontmatterProfile {
   description: string;
   appliesToPaths: string[];
   fields: ProfileField[];
+  /** Which model recipe fills `from: [model]` fields; empty means the settings default. */
+  modelProvider: string;
   /** Problems found while reading the file; the profile still loads what it can. */
   problems: string[];
 }
@@ -131,6 +144,7 @@ export function parseProfile(content: string, path: string): FrontmatterProfile 
     description: typeof meta['description'] === 'string' ? meta['description'] : '',
     appliesToPaths: strings(meta['applies-to-paths']),
     fields: [],
+    modelProvider: '',
     problems,
   };
   if (profile.appliesToPaths.length === 0) problems.push('no applies-to-paths globs, so it matches no note');
@@ -144,6 +158,7 @@ export function parseProfile(content: string, path: string): FrontmatterProfile 
     problems.push('the metafetch-profile block is not valid YAML');
     return profile;
   }
+  if (typeof config['model'] === 'string') profile.modelProvider = config['model'];
   const fields = asRecord(config['fields']);
   if (!fields) {
     problems.push('the metafetch-profile block has no fields map');
@@ -162,18 +177,35 @@ export function parseProfile(content: string, path: string): FrontmatterProfile 
       problems.push(`${key}: unknown page value ${JSON.stringify(page)}`);
       continue;
     }
-    if (platform === undefined && page === undefined) {
-      problems.push(`${key}: needs a platform or a page value`);
+    const from = strings(spec['from']);
+    const describe = typeof spec['describe'] === 'string' ? spec['describe'].trim() : '';
+    const wantsModel = from.includes('model');
+    if (wantsModel && !describe) {
+      problems.push(`${key}: from: [model] needs a describe: instruction for the model`);
       continue;
     }
-    const from = strings(spec['from']);
+    if (wantsModel && platform !== undefined) {
+      problems.push(`${key}: social links come from the page, never a model, which would make them up`);
+      continue;
+    }
+    if (platform === undefined && page === undefined && !wantsModel) {
+      problems.push(`${key}: needs a platform, a page value, or from: [model] with describe`);
+      continue;
+    }
+    const type = spec['type'];
+    const values = strings(spec['values']);
+    if (wantsModel && type === 'enum' && values.length === 0) {
+      problems.push(`${key}: type enum needs a values list`);
+      continue;
+    }
     const field: ProfileField = {
       key,
       aliases: strings(spec['aliases']),
-      runnable: from.length === 0 || from.includes('direct'),
+      runnable: (platform !== undefined || page !== undefined) && (from.length === 0 || from.includes('direct')),
     };
     if (platform !== undefined) field.platform = platform;
     if (page !== undefined) field.page = page;
+    if (wantsModel) field.model = { describe, type: type === 'enum' || type === 'list' ? type : 'string', values };
     profile.fields.push(field);
   }
   return profile;
@@ -208,6 +240,8 @@ export interface FillReport {
   ambiguous: { key: string; candidates: string[] }[];
   /** Fields whose sources this version can't run. */
   skipped: string[];
+  /** Empty fields left for a model to fill, after the direct parser. */
+  forModel: string[];
 }
 
 function pageValue(data: OpenGraphData, page: PageValue): unknown {
@@ -235,11 +269,15 @@ export function planFill(
   socials: Record<SocialPlatform, SocialChoice> | null
 ): { values: Record<string, unknown>; report: FillReport } {
   const values: Record<string, unknown> = {};
-  const report: FillReport = { filled: [], alreadySet: [], notFound: [], ambiguous: [], skipped: [] };
+  const report: FillReport = { filled: [], alreadySet: [], notFound: [], ambiguous: [], skipped: [], forModel: [] };
 
   for (const field of profile.fields) {
     if (fieldIsSet(field, frontmatter)) { report.alreadySet.push(field.key); continue; }
-    if (!field.runnable) { report.skipped.push(field.key); continue; }
+    if (!field.runnable) {
+      if (field.model) report.forModel.push(field.key);
+      else report.skipped.push(field.key);
+      continue;
+    }
 
     if (field.platform) {
       const choice = socials?.[field.platform];
@@ -249,10 +287,85 @@ export function planFill(
     } else if (field.page) {
       const value = page ? pageValue(page, field.page) : undefined;
       if (isSet(value)) { values[field.key] = value; report.filled.push(field.key); }
+      else if (field.model) report.forModel.push(field.key);
       else report.notFound.push(field.key);
     }
   }
   return { values, report };
+}
+
+/**
+ * The JSON Schema a model reply must match: one property per field, each
+ * nullable, all required (strict structured-output modes require every
+ * property to be listed), no extra properties.
+ */
+export function modelSchema(fields: ProfileField[]): Record<string, unknown> {
+  const properties: Record<string, unknown> = {};
+  for (const f of fields) {
+    if (!f.model) continue;
+    const m = f.model;
+    const value = m.type === 'enum'
+      ? { type: 'string', enum: m.values }
+      : m.type === 'list'
+        ? { type: 'array', items: m.values.length ? { type: 'string', enum: m.values } : { type: 'string' } }
+        : { type: 'string' };
+    properties[f.key] = { anyOf: [value, { type: 'null' }], description: m.describe };
+  }
+  return { type: 'object', properties, required: Object.keys(properties), additionalProperties: false };
+}
+
+/** The instructions for one model call. */
+export function modelPrompt(
+  fields: ProfileField[],
+  note: { title: string; url: string; frontmatter: Record<string, unknown> },
+  pageText: { text: string; truncated: boolean }
+): { system: string; prompt: string } {
+  const system = [
+    'You fill in frontmatter properties for a note in an Obsidian vault, using only the web page you are given.',
+    'For each property, follow its instruction. If the page does not support a value, return null for it: an empty property is better than a guessed one.',
+    'Never invent URLs, names, numbers, or dates that are not on the page.',
+  ].join(' ');
+  const known = Object.entries(note.frontmatter)
+    .filter(([, v]) => typeof v === 'string' && v.length < 300)
+    .map(([k, v]) => `${k}: ${String(v as string)}`)
+    .join('\n');
+  const wanted = fields
+    .filter(f => f.model)
+    .map(f => {
+      const m = f.model!;
+      const allowed = m.values.length ? ` Allowed values: ${m.values.join(', ')}.` : '';
+      return `- ${f.key} (${m.type === 'list' ? 'a list' : m.type === 'enum' ? 'one value' : 'text'}): ${m.describe}${allowed}`;
+    })
+    .join('\n');
+  const prompt = [
+    `The note is about: ${note.title}`,
+    `Its URL: ${note.url}`,
+    known ? `What the note already says:\n${known}` : '',
+    `Properties to fill:\n${wanted}`,
+    `The page's text${pageText.truncated ? ' (the first part; the page is longer)' : ''}:\n<page>\n${pageText.text}\n</page>`,
+  ].filter(Boolean).join('\n\n');
+  return { system, prompt };
+}
+
+/**
+ * A model's value for one field, checked against the field's type. Returns
+ * undefined for null, the wrong shape, or a value outside an enum: nothing is
+ * written that the profile didn't allow.
+ */
+export function acceptModelValue(field: ProfileField, value: unknown): unknown {
+  const m = field.model;
+  if (!m || value === null || value === undefined) return undefined;
+  if (m.type === 'list') {
+    if (!Array.isArray(value)) return undefined;
+    const items = value.filter((v): v is string => typeof v === 'string').map(v => v.trim()).filter(Boolean)
+      .filter(v => m.values.length === 0 || m.values.includes(v));
+    return items.length ? [...new Set(items)] : undefined;
+  }
+  if (typeof value !== 'string') return undefined;
+  const t = value.trim();
+  if (!t) return undefined;
+  if (m.type === 'enum') return m.values.includes(t) ? t : undefined;
+  return t;
 }
 
 /** Does any empty field need the site's social links (and so its homepage)? */

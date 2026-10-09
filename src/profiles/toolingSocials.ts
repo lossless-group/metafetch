@@ -24,7 +24,9 @@ How a link is chosen:
 4. A link found only in the page body, with no resemblance to the brand, is never used. That's how customer logos and partner links stay out.
 5. When two links tie, nothing is written and both are reported.
 
-Edit the block below to change which fields this folder gets. Each field takes a \`platform\` (github-org, github-repo, linkedin-company, x, youtube, discord, instagram, facebook, bluesky, crunchbase) or a \`page\` value (title, description, image, favicon, site_name, type, authors, published), and optional \`aliases\`.
+\`zinger\` is written by a model reading the homepage's text, using the default provider in Metafetch settings (or add \`model: openai\` above \`fields:\` to pick one for this profile). It runs only when the field is empty, and only after the free fields are filled. Social links are never asked of a model, which would make them up.
+
+Edit the block below to change which fields this folder gets. Each field takes a \`platform\` (github-org, github-repo, linkedin-company, x, youtube, discord, instagram, facebook, bluesky, crunchbase) or a \`page\` value (title, description, image, favicon, site_name, type, authors, published), or \`from: [model]\` with a \`describe:\` instruction (and optionally \`type: enum\` or \`type: list\` with \`values\`), and optional \`aliases\`.
 
 \`\`\`metafetch-profile
 fields:
@@ -56,5 +58,8 @@ fields:
   og_favicon:
     page: favicon
     aliases: [favicon]
+  zinger:
+    from: [model]
+    describe: "One punchy sentence, under 90 characters, saying what this does and for whom."
 \`\`\`
 `;

@@ -539,3 +539,27 @@ export function parseOrReject(html: string, url: string): OpenGraphData {
 export async function fetchDirectOpenGraph(url: string): Promise<OpenGraphData> {
   return parseOrReject(await fetchPageHtml(url), url);
 }
+
+/**
+ * The readable text of a page, for a model to read: scripts, styles, and
+ * markup removed, block elements turned into line breaks, entities decoded.
+ * Cut at `maxChars` at a line boundary, so a model is never handed half a
+ * sentence; `truncated` says whether that happened.
+ */
+export function htmlToText(html: string, maxChars = 24000): { text: string; truncated: boolean } {
+  const body = html.match(/<body\b[^>]*>([\s\S]*)<\/body>/i)?.[1] ?? html;
+  const text = decodeEntities(
+    body
+      .replace(/<(script|style|noscript|svg|template|iframe)\b[\s\S]*?<\/\1>/gi, ' ')
+      .replace(/<!--[\s\S]*?-->/g, ' ')
+      .replace(/<(br|\/p|\/div|\/li|\/h[1-6]|\/tr|\/section|\/article|\/header|\/footer)\b[^>]*>/gi, '\n')
+      .replace(/<[^>]+>/g, ' ')
+  )
+    .replace(/[ \t\f\v\u00A0]+/g, ' ')
+    .replace(/ *\n */g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+  if (text.length <= maxChars) return { text, truncated: false };
+  const cut = text.lastIndexOf('\n', maxChars);
+  return { text: text.slice(0, cut > maxChars / 2 ? cut : maxChars), truncated: true };
+}

@@ -19,8 +19,9 @@ async function fetchInto(note: string, pageHtml: string): Promise<string> {
     let content = note;
     const file = new TFile();
     const app = {
-        workspace: { getActiveFile: () => file },
+        workspace: { getActiveFile: () => file, onLayoutReady: (cb: () => void) => cb() },
         vault: {
+            getMarkdownFiles: () => [],
             read: () => Promise.resolve(content),
             modify: (_f: unknown, next: string) => { content = next; return Promise.resolve(); },
         },

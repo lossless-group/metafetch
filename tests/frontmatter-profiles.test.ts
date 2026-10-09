@@ -40,8 +40,9 @@ describe('parseProfile', () => {
     });
 
     test('a field whose from: list excludes direct is loaded but not runnable', () => {
-        const p = parseProfile(profileFile(['T/**'], '  zinger: { page: description, from: [model] }'), 'p.md')!;
+        const p = parseProfile(profileFile(['T/**'], '  zinger: { page: description, from: [model], describe: "One line." }'), 'p.md')!;
         assert.equal(p.fields[0]?.runnable, false);
+        assert.equal(p.fields[0]?.model?.describe, 'One line.');
     });
 });
 

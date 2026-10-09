@@ -68,6 +68,12 @@ export function parseYaml(text: string): unknown {
     return parseYamlText(text) as unknown;
 }
 
+export class SecretComponent {
+    constructor(_app: unknown, _el: unknown) {
+        return chain() as SecretComponent;
+    }
+}
+
 export class ButtonComponent {
     constructor(_containerEl: unknown) {
         return chain() as ButtonComponent;

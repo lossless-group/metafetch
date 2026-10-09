@@ -2,6 +2,8 @@
 import type { App, SettingDefinition, SettingDefinitionItem } from 'obsidian';
 import { PluginSettingTab } from 'obsidian';
 import type MetafetchPlugin from '../../main';
+import { BUNDLED_RECIPES, type ProviderSettings } from '../services/modelRecipes';
+import { defaultProviderSettings, PROVIDERS_KEY, providerDefinitions } from '../services/modelProviderSettings';
 
 export interface MetafetchSettings {
     // Provider: OpenGraph.io
@@ -34,6 +36,13 @@ export interface MetafetchSettings {
 
     /** Vault folder holding folder profiles (metafetch-profile files). */
     profilesRoot: string;
+
+    /** Per model recipe: which keychain secret, which model, base URL, approved hosts. */
+    modelProviders: Record<string, ProviderSettings>;
+    /** The recipe used for from: [model] fields when a profile doesn't name one. */
+    defaultModelProvider: string;
+    /** Vault folder holding model recipes (metafetch-recipe files). */
+    recipesRoot: string;
 }
 
 export const DEFAULT_SETTINGS: MetafetchSettings = {
@@ -64,6 +73,10 @@ export const DEFAULT_SETTINGS: MetafetchSettings = {
     hexCodeLength: 6,
 
     profilesRoot: 'zz-cf-lib/frontmatter',
+
+    modelProviders: defaultProviderSettings(),
+    defaultModelProvider: 'anthropic',
+    recipesRoot: 'zz-cf-lib/recipes',
 };
 
 type SettingKey = keyof MetafetchSettings;
@@ -101,11 +114,27 @@ export class MetafetchSettingTab extends PluginSettingTab {
     }
 
     getControlValue(key: string): unknown {
+        const nested = this.providerPath(key);
+        if (nested) return this.plugin.settings.modelProviders[nested.id]?.[nested.field] ?? '';
         return isSettingKey(key) ? this.plugin.settings[key] : undefined;
     }
 
+    /** `modelProviders.<id>.<field>` → its parts, for the nested provider settings. */
+    private providerPath(key: string): { id: string; field: keyof ProviderSettings } | null {
+        const m = key.match(/^modelProviders\.([a-z0-9-]+)\.(model|baseUrl|approvedHosts)$/);
+        return m ? { id: m[1] ?? '', field: (m[2] ?? 'model') as keyof ProviderSettings } : null;
+    }
+
     async setControlValue(key: string, value: unknown): Promise<void> {
-        if (!isSettingKey(key)) return;
+        const nested = this.providerPath(key);
+        if (nested) {
+            const providers = this.plugin.settings.modelProviders;
+            const current = providers[nested.id] ?? { secret: '', model: '', baseUrl: '', approvedHosts: '' };
+            providers[nested.id] = { ...current, [nested.field]: typeof value === 'string' ? value.trim() : '' };
+            await this.plugin.saveSettings();
+            return;
+        }
+        if (!isSettingKey(key) || key === PROVIDERS_KEY) return;
         const settings = this.plugin.settings as unknown as Record<SettingKey, unknown>;
         const fallback = DEFAULT_SETTINGS[key];
 
@@ -130,7 +159,7 @@ export class MetafetchSettingTab extends PluginSettingTab {
         const fieldRows: SettingDefinition[] = FIELD_ROWS.map(([name, desc, key]) => ({
             name,
             desc,
-            control: { type: 'text', key, placeholder: String(DEFAULT_SETTINGS[key]) },
+            control: { type: 'text', key, placeholder: DEFAULT_SETTINGS[key] as string },
         }));
 
         return [
@@ -239,6 +268,19 @@ export class MetafetchSettingTab extends PluginSettingTab {
                     },
                 ],
             },
+            ...providerDefinitions({
+                app: this.app,
+                recipes: this.plugin.recipes ?? BUNDLED_RECIPES,
+                providers: this.plugin.settings.modelProviders,
+                recipesRoot: this.plugin.settings.recipesRoot,
+                setSecretName: async (id, name) => {
+                    const providers = this.plugin.settings.modelProviders;
+                    const current = providers[id] ?? { secret: '', model: '', baseUrl: '', approvedHosts: '' };
+                    providers[id] = { ...current, secret: name };
+                    await this.plugin.saveSettings();
+                },
+                rescan: () => { void this.plugin.loadRecipes().then(() => this.update()); },
+            }),
         ];
     }
 }
