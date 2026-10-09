@@ -20,6 +20,7 @@ It works the same way for notes about papers, articles, and companies. Fetch onc
 - **Nothing gets erased.** If a page has no image, title, or description, your note keeps the one it had.
 - **Better authors, cleaner text.** Apostrophes and HTML entities come through intact. Bylines are found in JSON-LD and visible author lines, and reading times are no longer stored as authors. Bot-check pages count as a failed fetch.
 - **Socials from a folder profile.** For a note under `Tooling/`, Metafetch reads the company's homepage and fills its GitHub org and repo, LinkedIn page, X, YouTube, Discord, and more. It only fills empty fields, and when the page links two equally likely profiles it writes neither.
+- **Any model, for the fields a page can't fill.** Mark a profile field `from: [model]` and Claude, OpenAI, TrustedRouter, a local LM Studio, or any API you describe in a recipe file fills it from the page's text. Keys stay in Obsidian's keychain.
 - **Searchable settings** on Obsidian 1.13's settings API.
 
 Full notes: [changelog/releases/0.2.0.md](changelog/releases/0.2.0.md).
@@ -33,6 +34,7 @@ Full notes: [changelog/releases/0.2.0.md](changelog/releases/0.2.0.md).
 | **Fetch from a frontmatter URL…** | Lists every URL in the note's frontmatter, under any property (`url`, `arxiv`, `doi`…), and fetches the one you pick with the provider you pick. | Depends on the provider. |
 | **Fill frontmatter from folder profile** | Fills the empty fields the note's folder profile asks for, such as a Tooling note's social links, from the company's own homepage. | Nothing. A profile in `zz-cf-lib/frontmatter/`. |
 | **Create example frontmatter profile** | Writes a Tooling socials profile into the profiles folder to start from. | Nothing. |
+| **Create example model recipe** | Writes a recipe for Google's Gemini API into `zz-cf-lib/recipes/`, to show how to add any model API. | Nothing. |
 | **Fetch Open Graph data for current file** | Opens a modal: overwrite or only fill in missing fields, record errors, update the fetch date. | An OpenGraph.io key. |
 | **Batch fetch Open Graph data** | Scans the current folder for notes with a URL and missing metadata, then processes them with a delay between requests. | An OpenGraph.io key. |
 
@@ -92,6 +94,39 @@ Run **Create example frontmatter profile** to get the full Tooling version, then
 5. If two links tie, neither is written, and the notice names both.
 
 A field that already has a value, under its own name or an alias, is never changed.
+
+### Fields a model fills
+
+Some fields need judgment rather than a link: a one-line zinger, a pricing model, a category. Mark them `from: [model]` with an instruction:
+
+```yaml
+  zinger:
+    from: [model]
+    describe: "One punchy sentence, under 90 characters, saying what this does and for whom."
+  pricing_model:
+    from: [model]
+    type: enum
+    values: [free, freemium, paid, open-source, enterprise]
+    describe: "How the product charges."
+```
+
+After the free fields are filled, the ones still empty go to a model in one call per note, along with the page's text. The reply is checked against each field: a value outside an `enum` or `list` is dropped, and the model is told to return nothing rather than guess. Social links and other URLs are never asked of a model.
+
+### Model providers
+
+**Settings → Metafetch → Model providers** lists every provider, each with its own key and model:
+
+| Provider | Default model | Notes |
+|---|---|---|
+| Claude (Anthropic) | `claude-opus-5-5` | Reply held to a JSON schema |
+| OpenAI | `gpt-6-astra` | Reply held to a strict JSON schema |
+| TrustedRouter | `openai/gpt-6-astra` | One key for hundreds of models, through an attested gateway |
+| OpenAI-compatible | you choose | LM Studio, Ollama, OpenRouter, Groq: set the base URL |
+| Your own | you choose | Any JSON-over-HTTP model API, as a recipe file in `zz-cf-lib/recipes/` |
+
+API keys are picked from **Obsidian's keychain**, never typed into Metafetch's settings file. The keychain belongs to the vault, so one secret named `anthropic` works for every plugin that uses it. Each key goes only to its provider's own host; a recipe file's key goes nowhere until you approve its host.
+
+To add any other API, run **Create example model recipe** and edit the copy. A recipe says where to send the request, where the key goes, what the body looks like (with `{{model}}`, `{{system}}`, `{{prompt}}`, and `{{schema}}` filled in), and where the reply's text is. Recipes are data only, never code.
 
 ## Getting started
 
