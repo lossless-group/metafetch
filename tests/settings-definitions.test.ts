@@ -210,15 +210,26 @@ describe('control bindings', () => {
 describe('model provider rows', () => {
     test('every bundled provider gets a group with a key row and a model row', () => {
         const defs = walk(makeTab().tab.getSettingDefinitions());
-        for (const heading of ['Model providers', 'Claude (Anthropic)', 'OpenAI', 'TrustedRouter', 'OpenAI-compatible endpoint']) {
+        for (const heading of ['Providers', 'Claude (Anthropic)', 'OpenAI', 'TrustedRouter', 'OpenAI-compatible endpoint']) {
             const group = defs.find(d => d.type === 'group' && d.heading === heading);
             assert.ok(group, `missing group ${heading}`);
-            if (heading === 'Model providers') continue;
+            if (heading === 'Providers') continue;
             const names = (group.items ?? []).map(i => i.name);
             assert.ok(names.includes('API key') && names.includes('Model'), `${heading}: ${names.join(', ')}`);
         }
         const compatible = defs.find(d => d.heading === 'OpenAI-compatible endpoint');
         assert.ok(compatible?.items?.some(i => i.name === 'Base URL'));
+    });
+
+    test('one Firecrawl group holds the key for every recipe that borrows it, with no model row', () => {
+        const defs = walk(makeTab().tab.getSettingDefinitions());
+        const firecrawl = defs.find(d => d.type === 'group' && d.heading === 'Firecrawl');
+        const names = (firecrawl?.items ?? []).map(i => i.name);
+        assert.ok(names.includes('API key') && !names.includes('Model'), names.join(', '));
+        assert.match(String(firecrawl?.items?.[0]?.desc), /Also used by: Firecrawl Branding, Fireround/);
+        assert.ok(!defs.some(d => d.heading === 'Fireround'), 'a borrowing recipe has no group of its own');
+        const dd = defs.find(d => d.control?.key === 'defaultModelProvider');
+        assert.ok(!Object.keys((dd?.control as { options?: Record<string, string> })?.options ?? {}).includes('firecrawl'), 'data recipes are not model providers');
     });
 
     test('nested provider settings read and write through the control keys', async () => {

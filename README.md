@@ -20,6 +20,7 @@ It works the same way for notes about papers, articles, and companies. Fetch onc
 - **Nothing gets erased.** If a page has no image, title, or description, your note keeps the one it had.
 - **Better authors, cleaner text.** Apostrophes and HTML entities come through intact. Bylines are found in JSON-LD and visible author lines, and reading times are no longer stored as authors. Bot-check pages count as a failed fetch.
 - **Socials from a folder profile.** For a note under `Tooling/`, Metafetch reads the company's homepage and fills its GitHub org and repo, LinkedIn page, X, YouTube, Discord, and more. It only fills empty fields, and when the page links two equally likely profiles it writes neither.
+- **Any data API, for what a page doesn't say.** Mark a field `from: [fireround]` and a Tooling note gets the company's latest funding round, lead investors, and sources. `from: [direct, firecrawl]` falls back to Firecrawl when a site refuses a plain fetch, and Firecrawl Branding adds logo colours and fonts. One Firecrawl key covers all three, and any other JSON API is a recipe file.
 - **Any model, for the fields a page can't fill.** Mark a profile field `from: [model]` and Claude, OpenAI, TrustedRouter, a local LM Studio, or any API you describe in a recipe file fills it from the page's text. Keys stay in Obsidian's keychain.
 - **Searchable settings** on Obsidian 1.13's settings API.
 
@@ -112,9 +113,41 @@ Some fields need judgment rather than a link: a one-line zinger, a pricing model
 
 After the free fields are filled, the ones still empty go to a model in one call per note, along with the page's text. The reply is checked against each field: a value outside an `enum` or `list` is dropped, and the model is told to return nothing rather than guess. Social links and other URLs are never asked of a model.
 
-### Model providers
+### Fields a data API fills
 
-**Settings → Metafetch → Model providers** lists every provider, each with its own key and model:
+Some facts aren't on the page at all: who led the last round, how much it raised. Others are, but the site refuses a plain fetch. Name a data recipe in a field's `from:` list and the output to read in `value:`:
+
+```yaml
+  og_image:
+    page: image
+    from: [direct, firecrawl]       # the page first; Firecrawl if the site refuses
+  latest_round:
+    from: [fireround]
+    value: round                    # "Series B"
+  latest_round_amount:
+    from: [fireround]
+    value: amount                   # "$75M"
+  lead_investors:
+    from: [fireround]
+    value: lead_investors           # a list
+  brand_color:
+    from: [firecrawl-branding]
+    value: primary_color
+```
+
+Sources run in order: the free parse, then data recipes, then a model, which only fills what nothing else could. Each recipe is called at most once per note, and only while a field still needs it. The recipe's output names stay in the recipe; your vault's key names stay in the profile, so either can change without the other.
+
+| Recipe | What it reads | Outputs |
+|---|---|---|
+| `firecrawl` | The page, through Firecrawl's scraper | `title`, `description`, `image`, `favicon`, `site_name`, `type`, `published`, `language`, `keywords` |
+| `firecrawl-branding` | The site's brand, through Firecrawl | `logo`, `favicon`, `image`, `primary_color`, `secondary_color`, `accent_color`, `background_color`, `color_scheme`, `heading_font`, `body_font`, `fonts` |
+| `fireround` | The company's latest round, from [Fireround](https://fireround.dev)'s verified feed | `round`, `round_stage`, `amount`, `amount_usd_millions`, `announced_on`, `lead_investors`, `other_investors`, `total_raised`, `valuation`, `previous_rounds`, `sources`, `fireround_url`, `company_name`, `company_description`, `sector`, `headquarters` |
+
+Fireround is matched on the note's domain, so a company with a similar name is never written. A field the source has no value for stays empty.
+
+### Providers
+
+**Settings → Metafetch → Providers** lists one group per key. Model providers each have a key and a model:
 
 | Provider | Default model | Notes |
 |---|---|---|
@@ -124,9 +157,36 @@ After the free fields are filled, the ones still empty go to a model in one call
 | OpenAI-compatible | you choose | LM Studio, Ollama, OpenRouter, Groq: set the base URL |
 | Your own | you choose | Any JSON-over-HTTP model API, as a recipe file in `zz-cf-lib/recipes/` |
 
+The **Firecrawl** group holds one key for `firecrawl`, `firecrawl-branding`, and `fireround`, and that key only ever goes to `api.firecrawl.dev`.
+
 API keys are picked from **Obsidian's keychain**, never typed into Metafetch's settings file. The keychain belongs to the vault, so one secret named `anthropic` works for every plugin that uses it. Each key goes only to its provider's own host; a recipe file's key goes nowhere until you approve its host.
 
-To add any other API, run **Create example model recipe** and edit the copy. A recipe says where to send the request, where the key goes, what the body looks like (with `{{model}}`, `{{system}}`, `{{prompt}}`, and `{{schema}}` filled in), and where the reply's text is. Recipes are data only, never code.
+To add any other model API, run **Create example model recipe** and edit the copy. A recipe says where to send the request, where the key goes, what the body looks like (with `{{model}}`, `{{system}}`, `{{prompt}}`, and `{{schema}}` filled in), and where the reply's text is. Recipes are data only, never code.
+
+A data recipe is the same, with `kind: data` and named outputs instead of reply text. Its body can use `{{url}}`, `{{domain}}` (the note's URL without `www.`), and `{{title}}`. With `provider: firecrawl` it borrows the Firecrawl key, which can still only go to Firecrawl's host. That makes anything in Firecrawl's provider catalogue one file away:
+
+````markdown
+```cf-recipe
+id: my-catalogue-lookup
+kind: data
+provider: firecrawl
+title: My catalogue lookup
+request:
+  url: https://api.firecrawl.dev/v2/scrape
+  body:
+    alexandria: { provider: <provider>, capability: <capability>, options: { domain: "{{domain}}" } }
+response:
+  error: data.alexandria[0].error          # a provider error inside a 200
+  records: data.alexandria[0].data.data    # a list of results…
+  match: { domain: "{{domain}}" }          # …of which only an exact match is read
+  outputs:
+    founded: founded_year
+    founders: founders[*].name             # [*] reads every element: a list
+    website: [website, homepage]           # the first path that has a value
+```
+````
+
+A data recipe with no `provider:` holds its own key, and that key goes nowhere until you approve its host in settings. Values are written only as text, numbers, yes/no, or lists of those; objects and inline `data:` images are dropped.
 
 ## Getting started
 

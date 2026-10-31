@@ -28,6 +28,8 @@ How a link is chosen:
 
 Edit the block below to change which fields this folder gets. Each field takes a \`platform\` (github-org, github-repo, linkedin-company, x, youtube, discord, instagram, facebook, bluesky, crunchbase) or a \`page\` value (title, description, image, favicon, site_name, type, authors, published), or \`from: [model]\` with a \`describe:\` instruction (and optionally \`type: enum\` or \`type: list\` with \`values\`), and optional \`aliases\`.
 
+A field can also come from a data recipe: list it in \`from:\` and name its output in \`value:\`. With a Firecrawl key in settings, uncomment the lines at the end of the block to add funding rounds (Fireround), brand colours (Firecrawl Branding), and a Firecrawl fallback for sites that refuse a plain fetch (\`from: [direct, firecrawl]\` on \`og_image\`). The README lists every recipe's outputs.
+
 \`\`\`metafetch-profile
 fields:
   github_profile_url:
@@ -61,5 +63,12 @@ fields:
   zinger:
     from: [model]
     describe: "One punchy sentence, under 90 characters, saying what this does and for whom."
+  # latest_round:          { from: [fireround], value: round }
+  # latest_round_amount:   { from: [fireround], value: amount }
+  # latest_round_date:     { from: [fireround], value: announced_on }
+  # lead_investors:        { from: [fireround], value: lead_investors }
+  # total_raised:          { from: [fireround], value: total_raised }
+  # funding_sources:       { from: [fireround], value: sources }
+  # brand_color:           { from: [firecrawl-branding], value: primary_color }
 \`\`\`
 `;

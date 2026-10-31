@@ -1,4 +1,4 @@
-// Settings rows for model providers, for Obsidian 1.13's declarative
+// Settings rows for providers (the recipes that hold a key), for Obsidian 1.13's declarative
 // settings API. Paired with modelRecipes.ts; together they're meant to be
 // copied into any Lossless plugin that calls a model (copied, not imported:
 // each plugin ships standalone).
@@ -10,13 +10,13 @@
 
 import { SecretComponent } from 'obsidian';
 import type { App, SettingDefinitionItem, SettingGroupItem } from 'obsidian';
-import { BUNDLED_RECIPES, type ModelRecipe, type ProviderSettings } from './modelRecipes';
+import { ALL_BUNDLED_RECIPES, type ModelRecipe, type ProviderSettings } from './modelRecipes';
 
 export const PROVIDERS_KEY = 'modelProviders';
 export const DEFAULT_PROVIDER_KEY = 'defaultModelProvider';
 
 export function defaultProviderSettings(): Record<string, ProviderSettings> {
-  return Object.fromEntries(BUNDLED_RECIPES.map(r => [r.id, { secret: '', model: r.defaultModel, baseUrl: r.defaultBaseUrl, approvedHosts: '' }]));
+  return Object.fromEntries(ALL_BUNDLED_RECIPES.filter(r => r.provider === r.id).map(r => [r.id, { secret: '', model: r.defaultModel, baseUrl: r.defaultBaseUrl, approvedHosts: '' }]));
 }
 
 /** A provider's settings, filled in for recipes added since the settings were saved. */
@@ -65,12 +65,12 @@ export const providerKey = (id: string, field: keyof ProviderSettings) => `${PRO
 
 export function providerDefinitions(o: ProviderRowsOptions): SettingDefinitionItem[] {
   const options: Record<string, string> = {};
-  for (const r of o.recipes) options[r.id] = r.title;
+  for (const r of o.recipes) if (r.kind === 'model') options[r.id] = r.title;
 
   const items: SettingDefinitionItem[] = [
     {
       type: 'group',
-      heading: 'Model providers',
+      heading: 'Providers',
       items: [
         {
           name: 'Default model provider',
@@ -79,7 +79,7 @@ export function providerDefinitions(o: ProviderRowsOptions): SettingDefinitionIt
         },
         {
           name: 'Recipes folder',
-          desc: `Add any other model API as a recipe file here. ${o.recipes.filter(r => r.origin === 'vault').length} found.`,
+          desc: `Add any other model or data API as a recipe file here. ${o.recipes.filter(r => r.origin === 'vault').length} found.`,
           control: { type: 'folder', key: 'recipesRoot', placeholder: o.recipesRoot },
         },
         {
@@ -93,10 +93,12 @@ export function providerDefinitions(o: ProviderRowsOptions): SettingDefinitionIt
     },
   ];
 
-  for (const recipe of o.recipes) {
+  // One group per key: recipes that borrow another's key are listed under it.
+  for (const recipe of o.recipes.filter(r => r.provider === r.id)) {
     const p = providerSettings(o.providers, recipe);
+    const borrowers = o.recipes.filter(r => r.provider === recipe.id && r.id !== recipe.id).map(r => r.title);
     const rows: SettingGroupItem[] = [
-      { name: `About ${recipe.title}`, desc: recipe.description },
+      { name: `About ${recipe.title}`, desc: recipe.description + (borrowers.length ? ` Also used by: ${borrowers.join(', ')}.` : '') },
     ];
     if (recipe.request.auth !== 'none') {
       rows.push({
@@ -109,7 +111,7 @@ export function providerDefinitions(o: ProviderRowsOptions): SettingDefinitionIt
         },
       });
     }
-    rows.push({
+    if (recipe.kind === 'model') rows.push({
       name: 'Model',
       desc: recipe.defaultModel ? `Default: ${recipe.defaultModel}.` : 'The model name your endpoint expects.',
       control: { type: 'text', key: providerKey(recipe.id, 'model'), placeholder: recipe.defaultModel || 'Model name' },

@@ -2,7 +2,7 @@
 import type { App, SettingDefinition, SettingDefinitionItem } from 'obsidian';
 import { PluginSettingTab } from 'obsidian';
 import type MetafetchPlugin from '../../main';
-import { BUNDLED_RECIPES, type ProviderSettings } from '../services/modelRecipes';
+import { ALL_BUNDLED_RECIPES, type ProviderSettings } from '../services/modelRecipes';
 import { defaultProviderSettings, PROVIDERS_KEY, providerDefinitions } from '../services/modelProviderSettings';
 
 export interface MetafetchSettings {
@@ -37,11 +37,11 @@ export interface MetafetchSettings {
     /** Vault folder holding folder profiles (metafetch-profile files). */
     profilesRoot: string;
 
-    /** Per model recipe: which keychain secret, which model, base URL, approved hosts. */
+    /** Per recipe that holds a key: which keychain secret, which model, base URL, approved hosts. */
     modelProviders: Record<string, ProviderSettings>;
     /** The recipe used for from: [model] fields when a profile doesn't name one. */
     defaultModelProvider: string;
-    /** Vault folder holding model recipes (cf-recipe files). */
+    /** Vault folder holding model and data recipes (cf-recipe files). */
     recipesRoot: string;
 }
 
@@ -270,7 +270,7 @@ export class MetafetchSettingTab extends PluginSettingTab {
             },
             ...providerDefinitions({
                 app: this.app,
-                recipes: this.plugin.recipes ?? BUNDLED_RECIPES,
+                recipes: this.plugin.recipes ?? ALL_BUNDLED_RECIPES,
                 providers: this.plugin.settings.modelProviders,
                 recipesRoot: this.plugin.settings.recipesRoot,
                 setSecretName: async (id, name) => {

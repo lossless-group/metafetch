@@ -12,7 +12,7 @@ import { SelectUrlModal } from './src/modals/SelectUrlModal';
 import type { FetchProvider } from './src/modals/SelectUrlModal';
 import { stampIdentityCode } from './src/utils/hexCode';
 import { createExampleProfile, createExampleRecipe, fillFromProfile, listVaultRecipes } from './src/commands/fillFromProfile';
-import { BUNDLED_RECIPES, type ModelRecipe } from './src/services/modelRecipes';
+import { ALL_BUNDLED_RECIPES, type ModelRecipe } from './src/services/modelRecipes';
 import { mergeProviderSettings } from './src/services/modelProviderSettings';
 import { SelectProfileModal } from './src/modals/SelectProfileModal';
 import type { FrontmatterProfile } from './src/services/frontmatterProfiles';
@@ -25,8 +25,8 @@ export default class MetafetchPlugin extends Plugin {
     // `undefined` at construction.
     declare settings: MetafetchSettings;
 
-    /** Bundled model recipes, then any found in the recipes folder. */
-    recipes: ModelRecipe[] = [...BUNDLED_RECIPES];
+    /** Bundled model and data recipes, then any found in the recipes folder. */
+    recipes: ModelRecipe[] = [...ALL_BUNDLED_RECIPES];
 
     async onload(): Promise<void> {
         await this.loadSettings();
@@ -63,7 +63,7 @@ export default class MetafetchPlugin extends Plugin {
     /** Re-reads the recipes folder. Problems are logged, not fatal. */
     async loadRecipes(): Promise<void> {
         const { recipes, problems } = await listVaultRecipes(this.app, this.settings.recipesRoot);
-        this.recipes = [...BUNDLED_RECIPES, ...recipes];
+        this.recipes = [...ALL_BUNDLED_RECIPES, ...recipes];
         for (const p of problems) console.warn(`Metafetch recipe: ${p}`);
     }
 

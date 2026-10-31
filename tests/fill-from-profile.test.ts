@@ -5,7 +5,7 @@ import { test, describe, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { TFile, TFolder, Notice } from 'obsidian';
 import { fillFromProfile as fill, createExampleProfile, siteRoot, type FillOptions } from '../src/commands/fillFromProfile';
-import { BUNDLED_RECIPES } from '../src/services/modelRecipes';
+import { ALL_BUNDLED_RECIPES } from '../src/services/modelRecipes';
 import { defaultProviderSettings } from '../src/services/modelProviderSettings';
 import { TOOLING_SOCIALS_PROFILE } from '../src/profiles/toolingSocials';
 import type { App } from 'obsidian';
@@ -15,7 +15,7 @@ const ROOT = 'zz-cf-lib/frontmatter';
 
 const OPTIONS: FillOptions = {
     profilesRoot: ROOT,
-    recipes: BUNDLED_RECIPES,
+    recipes: ALL_BUNDLED_RECIPES,
     providers: defaultProviderSettings(),
     defaultModelProvider: 'anthropic',
     getSecret: () => null,

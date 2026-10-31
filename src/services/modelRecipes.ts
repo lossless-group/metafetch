@@ -1,10 +1,19 @@
-// Model recipes: any model API, described as data.
+// Recipes: any model or data API, described as data.
 //
 // A recipe says where to send a request, which stored secret to attach and
-// how, what the body looks like, and where the reply's text is. Claude,
-// OpenAI, TrustedRouter, and any OpenAI-compatible endpoint ship as bundled
-// recipes; anything else is a recipe file in the vault
-// (zz-cf-lib/recipes/*.md, in a `cf-recipe` block).
+// how, what the body looks like, and what to read out of the reply. There are
+// two kinds:
+//
+// - `model` recipes return text holding a JSON object (Claude, OpenAI,
+//   TrustedRouter, any OpenAI-compatible endpoint).
+// - `data` recipes return named outputs read from a JSON reply by path
+//   (Firecrawl, Firecrawl Branding, Fireround). A profile field picks one
+//   output by name, so the recipe's vocabulary never dictates a vault's keys.
+//
+// Anything else is a recipe file in the vault (zz-cf-lib/recipes/*.md, in a
+// `cf-recipe` block). A data recipe can borrow another recipe's key with
+// `provider:`, and the key still only goes to that provider's hosts: a vault
+// file with `provider: firecrawl` can call anything in Firecrawl's catalogue.
 //
 // Recipes are data, never code: the only computation is substituting
 // {{variables}} into the body and reading one path out of the response.
@@ -16,8 +25,16 @@ import { parseYaml, requestUrl } from 'obsidian';
 
 export type AuthPlacement = 'bearer' | `header:${string}` | `query:${string}` | 'none';
 
+export type RecipeKind = 'model' | 'data';
+
 export interface ModelRecipe {
   id: string;
+  kind: RecipeKind;
+  /**
+   * The recipe whose key, settings, and allowed hosts this one uses. Its own
+   * id, unless a data recipe shares another's key.
+   */
+  provider: string;
   title: string;
   /** Where the recipe came from; vault recipes need host approval in settings. */
   origin: 'bundled' | 'vault';
@@ -32,8 +49,16 @@ export interface ModelRecipe {
     /** JSON body template; see substitute(). */
     body: unknown;
   };
-  /** Path to the reply's text: `choices[0].message.content`, `content[?type=text].text`. */
+  /** Model recipes: path to the reply's text, `choices[0].message.content`, `content[?type=text].text`. */
   responseText: string;
+  /** Data recipes: a path that holds the provider's error message, when it reports one inside a 200. */
+  responseError?: string;
+  /** Data recipes: path to a list of results. Outputs are read from the first one that matches. */
+  records?: string;
+  /** Data recipes: record path → expected value (may use {{domain}} etc.), compared case-insensitively. */
+  match?: Record<string, string>;
+  /** Data recipes: output name → paths to try in order. */
+  outputs?: Record<string, string[]>;
   defaultModel: string;
   /** Default base URL, for recipes whose URL starts with {{baseUrl}}. */
   defaultBaseUrl: string;
@@ -51,6 +76,8 @@ const PROMPT_VAR = '{{prompt}}';
 export const BUNDLED_RECIPES: ModelRecipe[] = [
   {
     id: 'anthropic',
+    kind: 'model',
+    provider: 'anthropic',
     title: 'Claude (Anthropic)',
     origin: 'bundled',
     description: 'The Anthropic Messages API, with the reply held to a JSON schema. Get a key at console.anthropic.com.',
@@ -83,6 +110,8 @@ export const BUNDLED_RECIPES: ModelRecipe[] = [
   },
   {
     id: 'openai',
+    kind: 'model',
+    provider: 'openai',
     title: 'OpenAI',
     origin: 'bundled',
     description: 'OpenAI Chat Completions, with the reply held to a strict JSON schema. Get a key at platform.openai.com.',
@@ -108,6 +137,8 @@ export const BUNDLED_RECIPES: ModelRecipe[] = [
   },
   {
     id: 'trustedrouter',
+    kind: 'model',
+    provider: 'trustedrouter',
     title: 'TrustedRouter',
     origin: 'bundled',
     description: 'One OpenAI-compatible key for hundreds of models, through an attested gateway. Model names look like openai/gpt-6-astra. Get a key at trustedrouter.com.',
@@ -133,6 +164,8 @@ export const BUNDLED_RECIPES: ModelRecipe[] = [
   },
   {
     id: 'openai-compatible',
+    kind: 'model',
+    provider: 'openai-compatible',
     title: 'OpenAI-compatible endpoint',
     origin: 'bundled',
     description: 'Any API that speaks OpenAI Chat Completions: LM Studio, Ollama, OpenRouter, Groq, a self-hosted gateway. Set its base URL; the key is only sent to that host.',
@@ -157,6 +190,124 @@ export const BUNDLED_RECIPES: ModelRecipe[] = [
     enforcesSchema: false,
   },
 ];
+
+// Firecrawl's metadata keys come in two spellings; outputs try both.
+const FC_META = 'data.metadata';
+
+/** Recipes that read data rather than ask a model. All three share one Firecrawl key. */
+export const BUNDLED_DATA_RECIPES: ModelRecipe[] = [
+  {
+    id: 'firecrawl',
+    kind: 'data',
+    provider: 'firecrawl',
+    title: 'Firecrawl',
+    origin: 'bundled',
+    description: 'Reads a page through Firecrawl\'s scraper, for sites that refuse a plain fetch. Its outputs are the page values (title, description, image, favicon, site_name, type, published). The same key runs Firecrawl Branding, Fireround, and any recipe file with provider: firecrawl. Get a key at firecrawl.dev.',
+    request: {
+      method: 'POST',
+      url: 'https://api.firecrawl.dev/v2/scrape',
+      headers: { 'content-type': 'application/json' },
+      auth: 'bearer',
+      body: { url: '{{url}}', formats: ['markdown'], onlyMainContent: true },
+    },
+    responseText: '',
+    responseError: 'error',
+    outputs: {
+      title: [`${FC_META}.ogTitle`, `${FC_META}.og:title`, `${FC_META}.title`],
+      description: [`${FC_META}.ogDescription`, `${FC_META}.og:description`, `${FC_META}.description`],
+      image: [`${FC_META}.ogImage`, `${FC_META}.og:image`],
+      favicon: [`${FC_META}.favicon`],
+      site_name: [`${FC_META}.ogSiteName`, `${FC_META}.og:site_name`, `${FC_META}.publisher`],
+      type: [`${FC_META}.og:type`, `${FC_META}.ogType`],
+      published: [`${FC_META}.article:published_time`, `${FC_META}.publishedTime`],
+      language: [`${FC_META}.language`],
+      keywords: [`${FC_META}.keywords`],
+    },
+    defaultModel: '',
+    defaultBaseUrl: '',
+    allowedHosts: ['api.firecrawl.dev'],
+    enforcesSchema: false,
+  },
+  {
+    id: 'firecrawl-branding',
+    kind: 'data',
+    provider: 'firecrawl',
+    title: 'Firecrawl Branding',
+    origin: 'bundled',
+    description: 'A site\'s logo, colours, and fonts, read by Firecrawl. Outputs: logo, favicon, image, primary_color, secondary_color, accent_color, background_color, color_scheme, heading_font, body_font, fonts. Uses the Firecrawl key.',
+    request: {
+      method: 'POST',
+      url: 'https://api.firecrawl.dev/v2/scrape',
+      headers: { 'content-type': 'application/json' },
+      auth: 'bearer',
+      body: { url: '{{url}}', formats: ['branding'] },
+    },
+    responseText: '',
+    responseError: 'error',
+    outputs: {
+      // Often an inline data: SVG, which is never written; a linked image is.
+      // (images.logoHref is where the logo links to, not the image.)
+      logo: ['data.branding.images.logo'],
+      favicon: ['data.branding.images.favicon'],
+      image: ['data.branding.images.ogImage'],
+      primary_color: ['data.branding.colors.primary'],
+      secondary_color: ['data.branding.colors.secondary'],
+      accent_color: ['data.branding.colors.accent'],
+      background_color: ['data.branding.colors.background'],
+      color_scheme: ['data.branding.colorScheme'],
+      heading_font: ['data.branding.typography.fontFamilies.heading'],
+      body_font: ['data.branding.typography.fontFamilies.primary'],
+      fonts: ['data.branding.fonts[*].family'],
+    },
+    defaultModel: '',
+    defaultBaseUrl: '',
+    allowedHosts: ['api.firecrawl.dev'],
+    enforcesSchema: false,
+  },
+  {
+    id: 'fireround',
+    kind: 'data',
+    provider: 'firecrawl',
+    title: 'Fireround',
+    origin: 'bundled',
+    description: 'A company\'s latest funding round, from Fireround\'s verified feed (through Firecrawl). Matched on the note\'s domain, so a similarly named company is never written. Outputs: round, round_stage, amount, amount_usd_millions, announced_on, lead_investors, other_investors, total_raised, valuation, previous_rounds, sources, fireround_url, company_name, company_description, sector, headquarters. Uses the Firecrawl key.',
+    request: {
+      method: 'POST',
+      url: 'https://api.firecrawl.dev/v2/scrape',
+      headers: { 'content-type': 'application/json' },
+      auth: 'bearer',
+      body: { alexandria: { provider: 'fireround', capability: 'rounds/search', options: { q: '{{domain}}', limit: 5 } } },
+    },
+    responseText: '',
+    responseError: 'data.alexandria[0].error',
+    records: 'data.alexandria[0].data.data',
+    match: { 'company.domain': '{{domain}}' },
+    outputs: {
+      round: ['stage_as_written'],
+      round_stage: ['stage'],
+      amount: ['amount.as_written'],
+      amount_usd_millions: ['amount.usd_millions'],
+      announced_on: ['announced_on'],
+      lead_investors: ['lead_investors'],
+      other_investors: ['other_investors'],
+      total_raised: ['total_as_written'],
+      valuation: ['valuation.as_written', 'valuation'],
+      previous_rounds: ['previous_rounds[*].stage_as_written'],
+      sources: ['sources[*].url'],
+      fireround_url: ['url'],
+      company_name: ['company.name'],
+      company_description: ['company.description'],
+      sector: ['company.sector'],
+      headquarters: ['company.headquarters'],
+    },
+    defaultModel: '',
+    defaultBaseUrl: '',
+    allowedHosts: ['api.firecrawl.dev'],
+    enforcesSchema: false,
+  },
+];
+
+export const ALL_BUNDLED_RECIPES: ModelRecipe[] = [...BUNDLED_RECIPES, ...BUNDLED_DATA_RECIPES];
 
 // --- Vault recipes ---------------------------------------------------------
 
@@ -198,29 +349,50 @@ export function parseRecipe(content: string, path: string): { recipe: ModelRecip
   }
   const response = asRecord(config['response']) ?? {};
   const responseText = str(response['text']);
+  const kind = str(config['kind'], 'model');
+  // Only data recipes may borrow another recipe's key.
+  const provider = kind === 'data' ? str(config['provider'], id).toLowerCase() : id;
+
+  const outputs: Record<string, string[]> = {};
+  for (const [name, paths] of Object.entries(asRecord(response['outputs']) ?? {})) {
+    const list = (Array.isArray(paths) ? paths : [paths]).filter((x): x is string => typeof x === 'string' && x.length > 0);
+    if (list.length) outputs[name] = list;
+  }
+  const match: Record<string, string> = {};
+  for (const [path, v] of Object.entries(asRecord(response['match']) ?? {})) {
+    if (typeof v === 'string' || typeof v === 'number') match[path] = String(v);
+  }
 
   if (!url) problems.push('request.url is missing');
-  if (!responseText) problems.push('response.text (the path to the reply text) is missing');
+  if (kind !== 'model' && kind !== 'data') problems.push(`unknown kind "${kind}" (model or data)`);
+  if (kind === 'model' && !responseText) problems.push('response.text (the path to the reply text) is missing');
+  if (kind === 'data' && Object.keys(outputs).length === 0) problems.push('response.outputs (output name → path) is missing');
   if (!['POST', 'GET', 'PUT'].includes(method)) problems.push(`unsupported method ${method}`);
   if (!/^(bearer|none|header:[A-Za-z0-9-]+|query:[A-Za-z0-9_-]+)$/.test(auth)) problems.push(`unsupported auth "${auth}"`);
-  if (BUNDLED_RECIPES.some(r => r.id === id)) problems.push(`id "${id}" is taken by a bundled recipe`);
+  if (ALL_BUNDLED_RECIPES.some(r => r.id === id)) problems.push(`id "${id}" is taken by a bundled recipe`);
   if (problems.length) return { recipe: null, problems };
 
-  return {
-    recipe: {
-      id,
-      title: str(config['title'], basename),
-      origin: 'vault',
-      description: str(config['description'], path),
-      request: { method: method as 'POST', url, headers, auth: auth as AuthPlacement, body: request['body'] ?? {} },
-      responseText,
-      defaultModel: str(config['model']),
-      defaultBaseUrl: str(config['base-url']),
-      allowedHosts: [],
-      enforcesSchema: config['enforces-schema'] === true,
-    },
-    problems,
+  const recipe: ModelRecipe = {
+    id,
+    kind: kind as RecipeKind,
+    provider,
+    title: str(config['title'], basename),
+    origin: 'vault',
+    description: str(config['description'], path),
+    request: { method: method as 'POST', url, headers, auth: auth as AuthPlacement, body: request['body'] ?? {} },
+    responseText,
+    defaultModel: str(config['model']),
+    defaultBaseUrl: str(config['base-url']),
+    allowedHosts: [],
+    enforcesSchema: config['enforces-schema'] === true,
   };
+  if (kind === 'data') {
+    recipe.outputs = outputs;
+    if (Object.keys(match).length) recipe.match = match;
+    if (str(response['records'])) recipe.records = str(response['records']);
+    if (str(response['error'])) recipe.responseError = str(response['error']);
+  }
+  return { recipe, problems };
 }
 
 // --- Running a recipe ------------------------------------------------------
@@ -260,13 +432,24 @@ export function substitute(template: unknown, vars: Record<string, unknown>): un
 
 /**
  * Reads one value out of a JSON response. Segments are dot-separated; `[n]`
- * indexes an array, `[-1]` counts from the end, and `[?key=value]` takes the
- * first element whose `key` equals `value`.
+ * indexes an array, `[-1]` counts from the end, `[?key=value]` takes the
+ * first element whose `key` equals `value`, and `[*]` reads the rest of the
+ * path from every element, giving a list.
  */
 export function readPath(data: unknown, path: string): unknown {
+  return walk(data, path.replace(/^\$\.?/, '').match(/[^.[\]]+|\[[^\]]*\]/g) ?? []);
+}
+
+function walk(data: unknown, parts: string[]): unknown {
   let cur: unknown = data;
-  for (const part of path.replace(/^\$\.?/, '').match(/[^.[\]]+|\[[^\]]*\]/g) ?? []) {
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i] ?? '';
     if (cur === undefined || cur === null) return undefined;
+    if (part === '[*]') {
+      if (!Array.isArray(cur)) return undefined;
+      const rest = parts.slice(i + 1);
+      return cur.map(el => walk(el, rest)).flat().filter(v => v !== undefined && v !== null);
+    }
     if (part.startsWith('[')) {
       const inner = part.slice(1, -1);
       if (!Array.isArray(cur)) return undefined;
@@ -335,30 +518,30 @@ export function allowedHostsFor(recipe: ModelRecipe, provider: ProviderSettings)
   return provider.approvedHosts.split(/[\s,]+/).map(h => h.trim().toLowerCase()).filter(Boolean);
 }
 
-export interface ModelCall {
-  recipe: ModelRecipe;
-  provider: ProviderSettings;
-  /** Reads a secret by name; Obsidian's app.secretStorage.getSecret in the app. */
-  getSecret: (name: string) => string | null;
-  system: string;
-  prompt: string;
-  /** JSON Schema of the expected object. */
-  schema: Record<string, unknown>;
+/** The recipe whose key and hosts a recipe uses: itself, or the one its `provider:` names. */
+export function keyHolderFor(recipe: ModelRecipe, recipes: ModelRecipe[]): ModelRecipe | null {
+  if (recipe.provider === recipe.id) return recipe;
+  const holder = recipes.find(r => r.id === recipe.provider);
+  // A holder that itself borrows would let a chain widen where a key goes.
+  return holder && holder.provider === holder.id ? holder : null;
 }
 
-/** Sends one recipe request and returns the JSON object in the reply. */
-export async function callModel(call: ModelCall): Promise<{ values: Record<string, unknown>; model: string }> {
-  const { recipe, provider } = call;
-  const model = provider.model.trim() || recipe.defaultModel;
-  if (!model) throw new ModelCallError(`${recipe.title}: no model is set. Choose one in Metafetch settings.`, 'NO_MODEL');
-  const baseUrl = (provider.baseUrl.trim() || recipe.defaultBaseUrl).replace(/\/+$/, '');
+interface Send {
+  recipe: ModelRecipe;
+  /** Whose key, settings, and allowed hosts apply. */
+  keyHolder: ModelRecipe;
+  provider: ProviderSettings;
+  getSecret: (name: string) => string | null;
+  /** Variables for the body. */
+  vars: Record<string, unknown>;
+  /** Variables for the URL, already encoded where they need to be. */
+  urlVars: Record<string, unknown>;
+}
 
-  const prompt = recipe.enforcesSchema
-    ? call.prompt
-    : `${call.prompt}\n\nReply with only a JSON object matching this schema, and nothing else:\n${JSON.stringify(call.schema)}`;
-  const vars = { model, baseUrl, system: call.system, prompt, schema: call.schema };
-
-  let url = String(substitute(recipe.request.url, { model, baseUrl }));
+/** Sends one recipe request, with the key placed and its host checked; returns the parsed JSON. */
+async function send(s: Send): Promise<unknown> {
+  const { recipe, keyHolder, provider } = s;
+  let url = String(substitute(recipe.request.url, s.urlVars));
   const host = hostOf(url);
   if (!host) throw new ModelCallError(`${recipe.title}: "${url}" is not a valid URL`, 'BAD_RECIPE');
   if (!url.startsWith('https://') && !LOCAL_HOSTS.has(host)) {
@@ -367,17 +550,17 @@ export async function callModel(call: ModelCall): Promise<{ values: Record<strin
 
   const headers: Record<string, string> = { ...recipe.request.headers };
   if (recipe.request.auth !== 'none') {
-    const allowed = allowedHostsFor(recipe, provider);
+    const allowed = allowedHostsFor(keyHolder, provider);
     if (!allowed.includes(host)) {
       throw new ModelCallError(
-        recipe.origin === 'vault'
-          ? `${recipe.title}: ${host} is not an approved host for its key. Add it under the recipe's approved hosts in Metafetch settings.`
-          : `${recipe.title}: its key may only go to ${allowed.join(', ')}, not ${host}.`,
+        keyHolder.origin === 'vault'
+          ? `${recipe.title}: ${host} is not an approved host for its key. Add it under ${keyHolder.title}'s approved hosts in Metafetch settings.`
+          : `${recipe.title}: the ${keyHolder.title} key may only go to ${allowed.join(', ')}, not ${host}.`,
         'HOST_NOT_APPROVED'
       );
     }
-    const secret = provider.secret ? call.getSecret(provider.secret) : null;
-    if (!secret) throw new ModelCallError(`${recipe.title}: no API key. Choose one under ${recipe.title} in Metafetch settings.`, 'NO_KEY');
+    const secret = provider.secret ? s.getSecret(provider.secret) : null;
+    if (!secret) throw new ModelCallError(`${recipe.title}: no API key. Choose one under ${keyHolder.title} in Metafetch settings.`, 'NO_KEY');
     const auth = recipe.request.auth;
     if (auth === 'bearer') headers['authorization'] = `Bearer ${secret}`;
     else if (auth.startsWith('header:')) headers[auth.slice('header:'.length)] = secret;
@@ -388,7 +571,7 @@ export async function callModel(call: ModelCall): Promise<{ values: Record<strin
     }
   }
 
-  const body = recipe.request.method === 'GET' ? undefined : JSON.stringify(substitute(recipe.request.body, vars));
+  const body = recipe.request.method === 'GET' ? undefined : JSON.stringify(substitute(recipe.request.body, s.vars));
   let res;
   try {
     res = await requestUrl({ url, method: recipe.request.method, headers, ...(body !== undefined ? { body } : {}), throw: false });
@@ -400,13 +583,43 @@ export async function callModel(call: ModelCall): Promise<{ values: Record<strin
     const detail = (res.text ?? '').slice(0, 300).replace(/\s+/g, ' ');
     throw new ModelCallError(`${recipe.title}: HTTP ${res.status}${detail ? ` (${detail})` : ''}`, 'HTTP_ERROR');
   }
-
-  let data: unknown;
   try {
-    data = JSON.parse(res.text) as unknown;
+    return JSON.parse(res.text) as unknown;
   } catch {
     throw new ModelCallError(`${recipe.title}: the response was not JSON`, 'BAD_RESPONSE');
   }
+}
+
+export interface ModelCall {
+  recipe: ModelRecipe;
+  provider: ProviderSettings;
+  /** Reads a secret by name; Obsidian's app.secretStorage.getSecret in the app. */
+  getSecret: (name: string) => string | null;
+  system: string;
+  prompt: string;
+  /** JSON Schema of the expected object. */
+  schema: Record<string, unknown>;
+}
+
+/** Sends one model recipe request and returns the JSON object in the reply. */
+export async function callModel(call: ModelCall): Promise<{ values: Record<string, unknown>; model: string }> {
+  const { recipe, provider } = call;
+  const model = provider.model.trim() || recipe.defaultModel;
+  if (!model) throw new ModelCallError(`${recipe.title}: no model is set. Choose one in Metafetch settings.`, 'NO_MODEL');
+  const baseUrl = (provider.baseUrl.trim() || recipe.defaultBaseUrl).replace(/\/+$/, '');
+
+  const prompt = recipe.enforcesSchema
+    ? call.prompt
+    : `${call.prompt}\n\nReply with only a JSON object matching this schema, and nothing else:\n${JSON.stringify(call.schema)}`;
+  const data = await send({
+    recipe,
+    keyHolder: recipe,
+    provider,
+    getSecret: call.getSecret,
+    vars: { model, baseUrl, system: call.system, prompt, schema: call.schema },
+    urlVars: { model, baseUrl },
+  });
+
   const stop = readPath(data, 'stop_reason') ?? readPath(data, 'choices[0].finish_reason');
   if (stop === 'refusal') throw new ModelCallError(`${recipe.title}: the model declined the request`, 'REFUSED');
   const text = readPath(data, recipe.responseText);
@@ -416,4 +629,90 @@ export async function callModel(call: ModelCall): Promise<{ values: Record<strin
   const values = parseJsonObject(text);
   if (!values) throw new ModelCallError(`${recipe.title}: the reply did not contain a JSON object`, 'BAD_RESPONSE');
   return { values, model };
+}
+
+/** What a data recipe can know about the note: its URL, that URL's domain, and its title. */
+export interface NoteVars {
+  url: string;
+  title: string;
+}
+
+/** `www.example.com` → `example.com`; empty for an unreadable URL. */
+export function domainOf(url: string): string {
+  return (hostOf(url) ?? '').replace(/^www\./, '');
+}
+
+/**
+ * A data value fit for frontmatter: text, a number, a yes/no, or a list of
+ * those. Objects, empty values, and inline `data:` blobs are dropped.
+ */
+export function acceptDataValue(value: unknown): unknown {
+  const one = (v: unknown): string | number | boolean | undefined => {
+    if (typeof v === 'number') return Number.isFinite(v) ? v : undefined;
+    if (typeof v === 'boolean') return v;
+    if (typeof v !== 'string') return undefined;
+    const t = v.trim();
+    return t && !/^data:/i.test(t) ? t : undefined;
+  };
+  if (Array.isArray(value)) {
+    const items = value.map(one).filter((v): v is string | number | boolean => v !== undefined);
+    return items.length ? [...new Set(items)] : undefined;
+  }
+  return one(value);
+}
+
+export interface DataCall {
+  recipe: ModelRecipe;
+  /** Every known recipe, to find the one whose key this recipe borrows. */
+  recipes: ModelRecipe[];
+  providers: Record<string, ProviderSettings>;
+  getSecret: (name: string) => string | null;
+  note: NoteVars;
+}
+
+/**
+ * Runs one data recipe for a note. Returns every output it could read, by
+ * name. A recipe with `records` and no matching record returns nothing:
+ * a near miss is never written.
+ */
+export async function callData(call: DataCall): Promise<Record<string, unknown>> {
+  const { recipe } = call;
+  if (recipe.kind !== 'data') throw new ModelCallError(`${recipe.title} is a model recipe; use from: [model]`, 'BAD_RECIPE');
+  const keyHolder = keyHolderFor(recipe, call.recipes);
+  if (!keyHolder) throw new ModelCallError(`${recipe.title}: its provider "${recipe.provider}" is not a recipe with its own key`, 'BAD_RECIPE');
+  const provider = call.providers[keyHolder.id] ?? { secret: '', model: '', baseUrl: '', approvedHosts: '' };
+
+  const vars = { url: call.note.url, domain: domainOf(call.note.url), title: call.note.title };
+  const baseUrl = (provider.baseUrl.trim() || keyHolder.defaultBaseUrl).replace(/\/+$/, '');
+  const urlVars = { baseUrl, ...Object.fromEntries(Object.entries(vars).map(([k, v]) => [k, encodeURIComponent(v)])) };
+  const data = await send({ recipe, keyHolder, provider, getSecret: call.getSecret, vars, urlVars });
+
+  if (recipe.responseError) {
+    const err = readPath(data, recipe.responseError);
+    if (err !== undefined && err !== null && err !== false && err !== '') {
+      const msg = typeof err === 'string' ? err : JSON.stringify(err);
+      throw new ModelCallError(`${recipe.title}: ${msg.slice(0, 300)}`, 'PROVIDER_ERROR');
+    }
+  }
+
+  let source: unknown = data;
+  if (recipe.records) {
+    const list = readPath(data, recipe.records);
+    if (!Array.isArray(list)) return {};
+    const want = Object.entries(recipe.match ?? {}).map(([path, v]) => [path, String(substitute(v, vars)).trim().toLowerCase()] as const);
+    source = list.find(rec => want.every(([path, v]) => {
+      const got = readPath(rec, path);
+      return (typeof got === 'string' || typeof got === 'number') && String(got).trim().toLowerCase() === v;
+    }));
+    if (source === undefined) return {};
+  }
+
+  const out: Record<string, unknown> = {};
+  for (const [name, paths] of Object.entries(recipe.outputs ?? {})) {
+    for (const path of paths) {
+      const v = acceptDataValue(readPath(source, path));
+      if (v !== undefined) { out[name] = v; break; }
+    }
+  }
+  return out;
 }

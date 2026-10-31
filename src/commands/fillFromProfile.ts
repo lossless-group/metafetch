@@ -1,11 +1,13 @@
 // "Fill frontmatter from folder profile": the note's folder profile says which
 // fields it should carry; the direct parser fills the empty ones from the
-// note's page and, for social links, from the site's homepage.
+// note's page and, for social links, from the site's homepage; data recipes
+// (Firecrawl, Fireround, recipe files) fill what it couldn't; a model fills
+// what's left.
 
 import { Notice, normalizePath, TFile, TFolder } from 'obsidian';
 import type { App } from 'obsidian';
 import { fetchPageHtml, htmlToText, isJunkTitle, parseDirectFetchHtml, parseOrReject } from '../services/directFetchService';
-import { callModel, parseRecipe, ModelCallError, type ModelRecipe, type ProviderSettings } from '../services/modelRecipes';
+import { callData, callModel, parseRecipe, ModelCallError, type ModelRecipe, type ProviderSettings } from '../services/modelRecipes';
 import { providerSettings } from '../services/modelProviderSettings';
 import { chooseSocialLinks } from '../services/socialLinks';
 import {
@@ -17,6 +19,7 @@ import {
   modelSchema,
   modelPrompt,
   acceptModelValue,
+  recipeOutput,
   type FillReport,
   type FrontmatterProfile,
 } from '../services/frontmatterProfiles';
@@ -29,7 +32,7 @@ export type ProfilePicker = (profiles: FrontmatterProfile[]) => Promise<Frontmat
 
 export interface FillOptions {
   profilesRoot: string;
-  /** Bundled and vault model recipes. */
+  /** Bundled and vault recipes, model and data. */
   recipes: ModelRecipe[];
   providers: Record<string, ProviderSettings>;
   defaultModelProvider: string;
@@ -156,12 +159,63 @@ export async function fillFromProfile(app: App, options: FillOptions, pick: Prof
   }
   pending.hide();
 
-  if (!page && !socials) {
+  const wantsRecipes = profile.fields.some(f => f.recipes.length > 0 && !fieldIsSet(f, fm));
+  if (!page && !socials && !wantsRecipes) {
     new Notice(`Metafetch (${profile.title}) failed — ${pageError ?? 'nothing could be read'}`);
     return;
   }
 
   const { values, report } = planFill(profile, fm, page, socials);
+  const title = typeof fm['title'] === 'string' ? fm['title'] : file.basename;
+
+  // Data recipes: each called at most once per note, and only while a field
+  // still needs it. A field tries its recipes in the order its from: lists.
+  const recipeNotes: string[] = [];
+  if (report.forRecipes.length > 0) {
+    const results = new Map<string, Record<string, unknown> | null>();
+    for (const key of report.forRecipes) {
+      const field = profile.fields.find(f => f.key === key);
+      if (!field) continue;
+      const output = recipeOutput(field);
+      let filled = false;
+      for (const id of field.recipes) {
+        if (!results.has(id)) {
+          const recipe = options.recipes.find(r => r.id === id);
+          if (!recipe) {
+            recipeNotes.push(`no recipe named "${id}"`);
+            results.set(id, null);
+            continue;
+          }
+          const working = new Notice(`Metafetch (${profile.title}): asking ${recipe.title}…`, 0);
+          try {
+            results.set(id, await callData({
+              recipe,
+              recipes: options.recipes,
+              providers: options.providers,
+              getSecret: options.getSecret,
+              note: { url, title },
+            }));
+          } catch (err) {
+            recipeNotes.push(err instanceof Error ? err.message : `${recipe.title} failed`);
+            results.set(id, null);
+          } finally {
+            working.hide();
+          }
+        }
+        const v = output ? results.get(id)?.[output] : undefined;
+        if (v !== undefined) {
+          values[key] = v;
+          report.filled.push(key);
+          filled = true;
+          break;
+        }
+      }
+      if (filled) continue;
+      if (field.model) report.forModel.push(key);
+      else report.notFound.push(key);
+    }
+    report.forRecipes = [];
+  }
 
   // Fields left for a model: one call per note, reading the page's text. No
   // page text, no call: a model asked about a page it can't see will guess.
@@ -178,7 +232,6 @@ export async function fillFromProfile(app: App, options: FillOptions, pick: Prof
     } else {
       const thinking = new Notice(`Metafetch (${profile.title}): asking ${recipe.title}…`, 0);
       try {
-        const title = typeof fm['title'] === 'string' ? fm['title'] : file.basename;
         const { system, prompt } = modelPrompt(fields, { title, url, frontmatter: fm }, htmlToText(html));
         const reply = await callModel({
           recipe,
@@ -216,7 +269,8 @@ export async function fillFromProfile(app: App, options: FillOptions, pick: Prof
       }
     });
   }
-  new Notice(summarize(profile, report) + modelNote, 15000);
+  const recipeNote = recipeNotes.length ? ` ${[...new Set(recipeNotes)].join('. ')}.` : '';
+  new Notice(summarize(profile, report) + recipeNote + modelNote, 15000);
   for (const a of report.ambiguous) console.debug(`Metafetch: ${file.path} ${a.key} candidates:`, a.candidates);
 }
 

@@ -31,6 +31,8 @@ related:
 
 # Folder-Aware Frontmatter Templates and Fetch Recipes
 
+> **Status, 2026-10-31:** slice 2 is built, without the cost preview (dropped: not wanted). Recipes now have two kinds, \`model\` and \`data\`. A data recipe reads named outputs from a JSON reply by path (with \`[*]\` for lists and a \`records\`/\`match\` pair so only an exact match is read), and can borrow another recipe's key with \`provider:\`, still bound to that provider's hosts. Bundled: \`firecrawl\` (page values, the fallback for sites that refuse a plain fetch), \`firecrawl-branding\`, and \`fireround\` (funding rounds via Firecrawl's Alexandria catalogue), all on one Firecrawl key. Profiles pick a recipe output with \`from: [<recipe>]\` + \`value:\`. Microlink was not moved onto a recipe (question 6).
+>
 > **Status, 2026-10-08:** slice 1 (profiles plus the direct parser, aimed at Tooling socials) is built: see `context-v/plans/2026-10-08_Folder-Profiles-and-Social-Links.md`. It settles questions 1–3 provisionally: the parser is copied into Metafetch, aliases are read-through only, and no provenance is written. Profile fields use `platform:` or `page:`; `from:` is honoured only as "includes `direct` or not". On 20 real Tooling notes, three homepages refused a plain fetch (403, 429, 525). Those are the first concrete case for slice 2.
 
 - [Why Care?](#why-care)

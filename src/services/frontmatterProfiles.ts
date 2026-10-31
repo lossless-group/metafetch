@@ -12,9 +12,12 @@
 //   ```
 //
 // `platform:` fields are filled from the site's own social links;
-// `page:` fields from the page's metadata; fields with `from: [model]` and a
-// `describe:` instruction by a model reading the page's text (see
-// modelRecipes.ts). Social links and other URLs are never asked of a model,
+// `page:` fields from the page's metadata; fields whose `from:` names a data
+// recipe (`from: [direct, firecrawl]`, `from: [fireround]`) from that
+// recipe's output named by `value:` (or by `page:`); fields with
+// `from: [model]` and a `describe:` instruction by a model reading the page's
+// text (see modelRecipes.ts). Sources run in that order: free, then data, then
+// a model, which only fills what nothing else could. Social links and other URLs are never asked of a model,
 // which would make them up. See context-v/explorations/Folder-Aware-Frontmatter-
 // Templates-and-Fetch-Recipes.md.
 
@@ -38,6 +41,10 @@ export interface ProfileField {
   aliases: string[];
   /** The direct parser may fill it (it has a platform or page value, and `from` allows `direct`). */
   runnable: boolean;
+  /** Data recipes to try, in order, when the direct parser didn't fill it. */
+  recipes: string[];
+  /** The recipe output to read; defaults to the `page` value. */
+  value?: string;
   /** A model may fill it, when the direct parser didn't. */
   model?: ModelFieldSpec;
 }
@@ -178,6 +185,8 @@ export function parseProfile(content: string, path: string): FrontmatterProfile 
       continue;
     }
     const from = strings(spec['from']);
+    const recipes = from.filter(f => f !== 'direct' && f !== 'model');
+    const value = typeof spec['value'] === 'string' ? spec['value'].trim() : undefined;
     const describe = typeof spec['describe'] === 'string' ? spec['describe'].trim() : '';
     const wantsModel = from.includes('model');
     if (wantsModel && !describe) {
@@ -188,8 +197,12 @@ export function parseProfile(content: string, path: string): FrontmatterProfile 
       problems.push(`${key}: social links come from the page, never a model, which would make them up`);
       continue;
     }
-    if (platform === undefined && page === undefined && !wantsModel) {
-      problems.push(`${key}: needs a platform, a page value, or from: [model] with describe`);
+    if (recipes.length && !value && page === undefined) {
+      problems.push(`${key}: from: [${recipes.join(', ')}] needs value: <the recipe output to read>`);
+      continue;
+    }
+    if (platform === undefined && page === undefined && !wantsModel && !recipes.length) {
+      problems.push(`${key}: needs a platform, a page value, a recipe in from: with a value, or from: [model] with describe`);
       continue;
     }
     const type = spec['type'];
@@ -202,7 +215,9 @@ export function parseProfile(content: string, path: string): FrontmatterProfile 
       key,
       aliases: strings(spec['aliases']),
       runnable: (platform !== undefined || page !== undefined) && (from.length === 0 || from.includes('direct')),
+      recipes,
     };
+    if (value) field.value = value;
     if (platform !== undefined) field.platform = platform;
     if (page !== undefined) field.page = page;
     if (wantsModel) field.model = { describe, type: type === 'enum' || type === 'list' ? type : 'string', values };
@@ -240,7 +255,9 @@ export interface FillReport {
   ambiguous: { key: string; candidates: string[] }[];
   /** Fields whose sources this version can't run. */
   skipped: string[];
-  /** Empty fields left for a model to fill, after the direct parser. */
+  /** Empty fields left for data recipes, after the direct parser. */
+  forRecipes: string[];
+  /** Empty fields left for a model to fill, after the direct parser and data recipes. */
   forModel: string[];
 }
 
@@ -269,13 +286,18 @@ export function planFill(
   socials: Record<SocialPlatform, SocialChoice> | null
 ): { values: Record<string, unknown>; report: FillReport } {
   const values: Record<string, unknown> = {};
-  const report: FillReport = { filled: [], alreadySet: [], notFound: [], ambiguous: [], skipped: [], forModel: [] };
+  const report: FillReport = { filled: [], alreadySet: [], notFound: [], ambiguous: [], skipped: [], forRecipes: [], forModel: [] };
+  // Not filled here: try its data recipes, then a model, then report it missing.
+  const pass = (field: ProfileField, missing: () => void) => {
+    if (field.recipes.length) report.forRecipes.push(field.key);
+    else if (field.model) report.forModel.push(field.key);
+    else missing();
+  };
 
   for (const field of profile.fields) {
     if (fieldIsSet(field, frontmatter)) { report.alreadySet.push(field.key); continue; }
     if (!field.runnable) {
-      if (field.model) report.forModel.push(field.key);
-      else report.skipped.push(field.key);
+      pass(field, () => report.skipped.push(field.key));
       continue;
     }
 
@@ -283,16 +305,18 @@ export function planFill(
       const choice = socials?.[field.platform];
       if (choice?.url) { values[field.key] = choice.url; report.filled.push(field.key); }
       else if (choice?.ambiguous) report.ambiguous.push({ key: field.key, candidates: choice.candidates.map(c => c.url) });
-      else report.notFound.push(field.key);
+      else pass(field, () => report.notFound.push(field.key));
     } else if (field.page) {
       const value = page ? pageValue(page, field.page) : undefined;
       if (isSet(value)) { values[field.key] = value; report.filled.push(field.key); }
-      else if (field.model) report.forModel.push(field.key);
-      else report.notFound.push(field.key);
+      else pass(field, () => report.notFound.push(field.key));
     }
   }
   return { values, report };
 }
+
+/** The recipe output a field reads. */
+export const recipeOutput = (field: ProfileField): string | undefined => field.value ?? field.page;
 
 /**
  * The JSON Schema a model reply must match: one property per field, each
