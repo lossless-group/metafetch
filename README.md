@@ -32,6 +32,7 @@ Full notes: [changelog/releases/0.2.0.md](changelog/releases/0.2.0.md).
 |---|---|---|
 | **Direct fetch from script** | Fetches the page itself and reads its Open Graph, Twitter, schema.org, and scholarly (`citation_*`) tags. | Nothing. No key, no rate limit. |
 | **Fetch via Microlink** | Same fields, through the Microlink API. | Nothing for about 50 requests a day; an optional key raises the limit. |
+| **Fetch via Fireround** | Writes the company's funding rounds into the note as a `json` block under `## Fundraising History`, exactly as Fireround returned them. Needs the note's `url` to be the company's homepage. | A Firecrawl key. |
 | **Fetch from a frontmatter URL…** | Lists every URL in the note's frontmatter, under any property (`url`, `arxiv`, `doi`…), and fetches the one you pick with the provider you pick. | Depends on the provider. |
 | **Fill frontmatter from folder profile** | Fills the empty fields the note's folder profile asks for, such as a Tooling note's social links, from the company's own homepage. | Nothing. A profile in `zz-cf-lib/frontmatter/`. |
 | **Create example frontmatter profile** | Writes a Tooling socials profile into the profiles folder to start from. | Nothing. |
@@ -185,6 +186,8 @@ response:
     website: [website, homepage]           # the first path that has a value
 ```
 ````
+
+Add `write-json-under: "Some Heading"` under `response:` and the recipe gets its own **Fetch via** command, like **Fetch via Fireround**. It writes the raw records into the note body as a `json` block under that heading, replacing any block already there, so a large answer stays out of your frontmatter. `json-key:` names the key they sit under, and `homepage-only: true` at the top level of the recipe skips notes whose `url` is a deeper page. The command appears after a rescan or the next time a recipe is loaded.
 
 A data recipe with no `provider:` holds its own key, and that key goes nowhere until you approve its host in settings. Values are written only as text, numbers, yes/no, or lists of those; objects and inline `data:` images are dropped.
 

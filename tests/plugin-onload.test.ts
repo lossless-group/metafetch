@@ -25,6 +25,7 @@ const COMMAND_IDS = [
     'batch-fetch-opengraph-data',
     'direct-fetch-from-script',
     'fetch-via-microlink',
+    'fetch-recipe-fireround',
     'fetch-from-frontmatter-url',
     'fill-from-folder-profile',
     'create-example-frontmatter-profile',

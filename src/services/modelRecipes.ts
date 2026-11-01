@@ -59,6 +59,16 @@ export interface ModelRecipe {
   match?: Record<string, string>;
   /** Data recipes: output name → paths to try in order. */
   outputs?: Record<string, string[]>;
+  /**
+   * Data recipes: only look up a note whose URL is a site's homepage. A deep URL
+   * is usually about something hosted on that domain, and what the API knows
+   * about the domain belongs to the host.
+   */
+  homepageOnly?: boolean;
+  /** Data recipes: gets a "Fetch via" command that writes the raw records as a JSON fence under this heading. */
+  writeJsonUnder?: string;
+  /** The key those records sit under in the fence; `records` unless a recipe names its own. */
+  jsonKey?: string;
   defaultModel: string;
   /** Default base URL, for recipes whose URL starts with {{baseUrl}}. */
   defaultBaseUrl: string;
@@ -276,12 +286,15 @@ export const BUNDLED_DATA_RECIPES: ModelRecipe[] = [
       url: 'https://api.firecrawl.dev/v2/scrape',
       headers: { 'content-type': 'application/json' },
       auth: 'bearer',
-      body: { alexandria: { provider: 'fireround', capability: 'rounds/search', options: { q: '{{domain}}', limit: 5 } } },
+      body: { alexandria: { provider: 'fireround', capability: 'rounds/search', options: { q: '{{domain}}', limit: 20 } } },
     },
     responseText: '',
     responseError: 'data.alexandria[0].error',
     records: 'data.alexandria[0].data.data',
     match: { 'company.domain': '{{domain}}' },
+    homepageOnly: true,
+    writeJsonUnder: 'Fundraising History',
+    jsonKey: 'rounds',
     outputs: {
       round: ['stage_as_written'],
       round_stage: ['stage'],
@@ -391,6 +404,9 @@ export function parseRecipe(content: string, path: string): { recipe: ModelRecip
     if (Object.keys(match).length) recipe.match = match;
     if (str(response['records'])) recipe.records = str(response['records']);
     if (str(response['error'])) recipe.responseError = str(response['error']);
+    if (config['homepage-only'] === true) recipe.homepageOnly = true;
+    if (str(response['write-json-under']).trim()) recipe.writeJsonUnder = str(response['write-json-under']).trim();
+    if (str(response['json-key'])) recipe.jsonKey = str(response['json-key']);
   }
   return { recipe, problems };
 }
@@ -642,6 +658,15 @@ export function domainOf(url: string): string {
   return (hostOf(url) ?? '').replace(/^www\./, '');
 }
 
+/** True when a URL has no path beyond its site's root. */
+export function isHomepage(url: string): boolean {
+  try {
+    return new URL(url.trim()).pathname.replace(/\/+$/, '') === '';
+  } catch {
+    return false;
+  }
+}
+
 /**
  * A data value fit for frontmatter: text, a number, a yes/no, or a list of
  * those. Objects, empty values, and inline `data:` blobs are dropped.
@@ -671,15 +696,18 @@ export interface DataCall {
 }
 
 /**
- * Runs one data recipe for a note. Returns every output it could read, by
- * name. A recipe with `records` and no matching record returns nothing:
- * a near miss is never written.
+ * Sends a data recipe's request and returns what it found, untouched: every
+ * record that matches, or the whole reply for a recipe without `records`. Empty
+ * means no match: a near miss is never kept.
  */
-export async function callData(call: DataCall): Promise<Record<string, unknown>> {
+export async function fetchRecords(call: DataCall): Promise<unknown[]> {
   const { recipe } = call;
   if (recipe.kind !== 'data') throw new ModelCallError(`${recipe.title} is a model recipe; use from: [model]`, 'BAD_RECIPE');
   const keyHolder = keyHolderFor(recipe, call.recipes);
   if (!keyHolder) throw new ModelCallError(`${recipe.title}: its provider "${recipe.provider}" is not a recipe with its own key`, 'BAD_RECIPE');
+  if (recipe.homepageOnly && !isHomepage(call.note.url)) {
+    throw new ModelCallError(`${recipe.title} skipped: ${call.note.url} is not a homepage, and what it finds there could belong to the host.`, 'NOT_HOMEPAGE');
+  }
   const provider = call.providers[keyHolder.id] ?? { secret: '', model: '', baseUrl: '', approvedHosts: '' };
 
   const vars = { url: call.note.url, domain: domainOf(call.note.url), title: call.note.title };
@@ -695,17 +723,21 @@ export async function callData(call: DataCall): Promise<Record<string, unknown>>
     }
   }
 
-  let source: unknown = data;
-  if (recipe.records) {
-    const list = readPath(data, recipe.records);
-    if (!Array.isArray(list)) return {};
-    const want = Object.entries(recipe.match ?? {}).map(([path, v]) => [path, String(substitute(v, vars)).trim().toLowerCase()] as const);
-    source = list.find(rec => want.every(([path, v]) => {
-      const got = readPath(rec, path);
-      return (typeof got === 'string' || typeof got === 'number') && String(got).trim().toLowerCase() === v;
-    }));
-    if (source === undefined) return {};
-  }
+  if (!recipe.records) return [data];
+  const list = readPath(data, recipe.records);
+  if (!Array.isArray(list)) return [];
+  const want = Object.entries(recipe.match ?? {}).map(([path, v]) => [path, String(substitute(v, vars)).trim().toLowerCase()] as const);
+  return (list as unknown[]).filter(rec => want.every(([path, v]) => {
+    const got = readPath(rec, path);
+    return (typeof got === 'string' || typeof got === 'number') && String(got).trim().toLowerCase() === v;
+  }));
+}
+
+/** Runs one data recipe for a note and returns every output it could read, by name, from the first match. */
+export async function callData(call: DataCall): Promise<Record<string, unknown>> {
+  const { recipe } = call;
+  const [source] = await fetchRecords(call);
+  if (source === undefined) return {};
 
   const out: Record<string, unknown> = {};
   for (const [name, paths] of Object.entries(recipe.outputs ?? {})) {

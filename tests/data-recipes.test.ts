@@ -14,6 +14,7 @@ import {
 import { defaultProviderSettings } from '../src/services/modelProviderSettings';
 import { parseProfile, planFill } from '../src/services/frontmatterProfiles';
 import { fillFromProfile, type FillOptions } from '../src/commands/fillFromProfile';
+import { fetchRecipeIntoNote } from '../src/commands/fetchRecipeIntoNote';
 import { extractFrontmatter, withFrontmatter } from '../src/utils/yamlFrontmatter';
 
 interface Sent { url: string; method?: string; headers?: Record<string, string>; body?: string }
@@ -281,5 +282,96 @@ describe('the example Tooling profile', () => {
         assert.deepEqual(p.problems, []);
         assert.deepEqual(p.fields.find(f => f.key === 'lead_investors')?.recipes, ['fireround']);
         assert.equal(parseProfile(TOOLING_SOCIALS_PROFILE, 'x.md')!.fields.some(f => f.recipes.length), false, 'commented out by default');
+    });
+});
+
+describe('Fetch via <recipe>: writing into the note body', () => {
+    const OPTIONS = { recipes: ALL_BUNDLED_RECIPES, providers: providers(), getSecret };
+
+    function vault(note: string) {
+        const file = Object.assign(new TFile(), { path: 'Tooling/Firecrawl.md', basename: 'Firecrawl' });
+        const state = { note, writes: 0 };
+        const app = {
+            workspace: { getActiveFile: () => file },
+            vault: {
+                read: () => Promise.resolve(state.note),
+                process: (_f: unknown, fn: (c: string) => string) => {
+                    state.note = fn(state.note);
+                    state.writes += 1;
+                    return Promise.resolve(state.note);
+                },
+            },
+        } as unknown as App;
+        return { app, state };
+    }
+
+    const NOTE = '---\nurl: "https://www.firecrawl.dev/"\n# Fundraising History\n---\n\n# Firecrawl\n\n## Fundraising History\n\n| Round |\n\n## Team\n';
+
+    test('every matching round goes under the heading, verbatim; the frontmatter is untouched', async () => {
+        const { app, state } = vault(NOTE);
+        const namesake = { ...ROUND, company: { domain: 'firecrawl.com' } };
+        const seriesA = { ...ROUND, id: 'series_a', stage_as_written: 'Series A' };
+        const sent = serve(() => ({ json: alexandria([ROUND, namesake, seriesA]) }));
+        await fetchRecipeIntoNote(app, 'fireround', OPTIONS);
+
+        assert.equal(JSON.parse(sent[0]?.body ?? '{}').alexandria.options.limit, 20);
+        assert.ok(state.note.startsWith('---\nurl: "https://www.firecrawl.dev/"\n# Fundraising History\n---\n'), 'a # comment in the YAML is not a heading');
+        const block = /## Fundraising History\n\n```json\n([\s\S]*?)\n```\n\n\| Round \|/.exec(state.note);
+        assert.ok(block, state.note);
+        assert.deepEqual(JSON.parse(block[1]!), { rounds: [ROUND, seriesA] });
+        assert.match(Notice.shown.at(-1) ?? '', /wrote 2 records under "Fundraising History"/);
+    });
+
+    test('running it again replaces the block', async () => {
+        const { app, state } = vault(NOTE);
+        serve(() => ({ json: alexandria([ROUND]) }));
+        await fetchRecipeIntoNote(app, 'fireround', OPTIONS);
+        await fetchRecipeIntoNote(app, 'fireround', OPTIONS);
+        assert.equal(state.note.match(/```json/g)?.length, 1);
+    });
+
+    test('nothing found: the note and any earlier block are left alone', async () => {
+        const { app, state } = vault(NOTE);
+        serve(() => ({ json: alexandria([]) }));
+        await fetchRecipeIntoNote(app, 'fireround', OPTIONS);
+        assert.equal(state.writes, 0);
+        assert.match(Notice.shown.at(-1) ?? '', /nothing found/);
+    });
+
+    test('a page on a site: no request, no write, and the notice says why', async () => {
+        const { app, state } = vault('---\nurl: "https://openai.com/sora"\n---\n');
+        const sent = serve(() => ({ json: alexandria([ROUND]) }));
+        await fetchRecipeIntoNote(app, 'fireround', OPTIONS);
+        assert.equal(sent.length, 0);
+        assert.equal(state.writes, 0);
+        assert.match(Notice.shown.at(-1) ?? '', /Fireround skipped: .* not a homepage/);
+    });
+
+    test('no key: says where to set it, and nothing is written', async () => {
+        const { app, state } = vault(NOTE);
+        await fetchRecipeIntoNote(app, 'fireround', { ...OPTIONS, providers: providers('') });
+        assert.equal(state.writes, 0);
+        assert.match(Notice.shown.at(-1) ?? '', /no API key\. Choose one under Firecrawl/);
+    });
+
+    test('no url, and a recipe that has since been deleted, each say so', async () => {
+        const { app } = vault('---\ntitle: x\n---\n');
+        await fetchRecipeIntoNote(app, 'fireround', OPTIONS);
+        assert.match(Notice.shown.at(-1) ?? '', /no url/);
+        await fetchRecipeIntoNote(app, 'gone', OPTIONS);
+        assert.match(Notice.shown.at(-1) ?? '', /"gone" is gone/);
+    });
+
+    test('a recipe file can ask for its own command, heading, and key', () => {
+        const r = parseRecipe('```cf-recipe\nid: x\nkind: data\nhomepage-only: true\nrequest: { url: "https://x.dev" }\nresponse:\n  write-json-under: Patents\n  json-key: patents\n  outputs: { a: b }\n```', 'x.md')!.recipe!;
+        assert.equal(r.writeJsonUnder, 'Patents');
+        assert.equal(r.jsonKey, 'patents');
+        assert.equal(r.homepageOnly, true);
+    });
+
+    test('profile fields honour the homepage check too', async () => {
+        const sent = serve(() => ({ json: alexandria([ROUND]) }));
+        await assert.rejects(run(recipe('fireround'), 'https://firecrawl.dev/pricing'), /not a homepage/);
+        assert.equal(sent.length, 0);
     });
 });

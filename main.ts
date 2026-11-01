@@ -12,6 +12,7 @@ import { SelectUrlModal } from './src/modals/SelectUrlModal';
 import type { FetchProvider } from './src/modals/SelectUrlModal';
 import { stampIdentityCode } from './src/utils/hexCode';
 import { createExampleProfile, createExampleRecipe, fillFromProfile, listVaultRecipes } from './src/commands/fillFromProfile';
+import { fetchRecipeIntoNote } from './src/commands/fetchRecipeIntoNote';
 import { ALL_BUNDLED_RECIPES, type ModelRecipe } from './src/services/modelRecipes';
 import { mergeProviderSettings } from './src/services/modelProviderSettings';
 import { SelectProfileModal } from './src/modals/SelectProfileModal';
@@ -27,6 +28,7 @@ export default class MetafetchPlugin extends Plugin {
 
     /** Bundled model and data recipes, then any found in the recipes folder. */
     recipes: ModelRecipe[] = [...ALL_BUNDLED_RECIPES];
+    private recipeCommands = new Set<string>();
 
     async onload(): Promise<void> {
         await this.loadSettings();
@@ -46,6 +48,7 @@ export default class MetafetchPlugin extends Plugin {
 
         // Register commands
         this.registerCommands();
+        this.registerRecipeCommands();
 
         // Vault recipes are vault files, readable once the vault has indexed.
         this.app.workspace.onLayoutReady(() => { void this.loadRecipes(); });
@@ -65,6 +68,32 @@ export default class MetafetchPlugin extends Plugin {
         const { recipes, problems } = await listVaultRecipes(this.app, this.settings.recipesRoot);
         this.recipes = [...ALL_BUNDLED_RECIPES, ...recipes];
         for (const p of problems) console.warn(`Metafetch recipe: ${p}`);
+        this.registerRecipeCommands();
+    }
+
+    /**
+     * A "Fetch via" command for every data recipe that writes into the note,
+     * bundled or from the recipes folder. A recipe file deleted later keeps its
+     * command until reload; running it then just says the recipe is gone.
+     */
+    private registerRecipeCommands(): void {
+        for (const recipe of this.recipes) {
+            if (recipe.kind !== 'data' || !recipe.writeJsonUnder) continue;
+            if (this.recipeCommands.has(recipe.id)) continue;
+            this.recipeCommands.add(recipe.id);
+            const id = recipe.id;
+            this.addCommand({
+                id: `fetch-recipe-${id}`,
+                name: `Fetch via ${recipe.title}`,
+                editorCallback: (_editor: Editor) => {
+                    void fetchRecipeIntoNote(this.app, id, {
+                        recipes: this.recipes,
+                        providers: this.settings.modelProviders,
+                        getSecret: name => this.app.secretStorage.getSecret(name),
+                    });
+                }
+            });
+        }
     }
 
     async saveSettings(): Promise<void> {
