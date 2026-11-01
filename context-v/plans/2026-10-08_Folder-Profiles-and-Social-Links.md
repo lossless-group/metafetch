@@ -22,6 +22,7 @@ tags:
   - Social-Links
 related:
   - "[[Folder-Aware-Frontmatter-Templates-and-Fetch-Recipes]]"
+type: Plans
 ---
 
 # Plan — Folder profiles and social links (slice 1)

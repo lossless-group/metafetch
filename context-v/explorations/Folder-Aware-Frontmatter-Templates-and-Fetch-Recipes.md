@@ -27,6 +27,7 @@ related:
   - "[[Per-Directory-Profile-Templates]]"
   - "[[Using-APIs-to-Ingest-More-Data]]"
   - "[[Add-New-API-Provider-to-Plugin]]"
+type: Explorations
 ---
 
 # Folder-Aware Frontmatter Templates and Fetch Recipes
