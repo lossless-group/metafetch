@@ -20,7 +20,8 @@ It works the same way for notes about papers, articles, and companies. Fetch onc
 - **Nothing gets erased.** If a page has no image, title, or description, your note keeps the one it had.
 - **Better authors, cleaner text.** Apostrophes and HTML entities come through intact. Bylines are found in JSON-LD and visible author lines, and reading times are no longer stored as authors. Bot-check pages count as a failed fetch.
 - **Socials from a folder profile.** For a note under `Tooling/`, Metafetch reads the company's homepage and fills its GitHub org and repo, LinkedIn page, X, YouTube, Discord, and more. It only fills empty fields, and when the page links two equally likely profiles it writes neither.
-- **Any data API, for what a page doesn't say.** Mark a field `from: [fireround]` and a Tooling note gets the company's latest funding round, lead investors, and sources. `from: [direct, firecrawl]` falls back to Firecrawl when a site refuses a plain fetch, and Firecrawl Branding adds logo colours and fonts. One Firecrawl key covers all three, and any other JSON API is a recipe file.
+- **Funding rounds in the note.** **Fetch via Fireround** writes a company's rounds under `## Fundraising History` as a `json` block, exactly as they arrived, and keeps them out of your frontmatter.
+- **Any data API, for what a page doesn't say.** `from: [direct, firecrawl]` falls back to Firecrawl when a site refuses a plain fetch, and Firecrawl Branding adds colours and fonts. One Firecrawl key covers all of it, and any other JSON API is a recipe file, with its own command if you want one.
 - **Any model, for the fields a page can't fill.** Mark a profile field `from: [model]` and Claude, OpenAI, TrustedRouter, a local LM Studio, or any API you describe in a recipe file fills it from the page's text. Keys stay in Obsidian's keychain.
 - **Searchable settings** on Obsidian 1.13's settings API.
 
