@@ -15,7 +15,7 @@ augmented_with:
 at_semantic_version: 0.0.0.1
 site_uuid: 0536b9d1-a146-46e1-a6e3-ae239edb02e6
 hex_code: u57cmc
-status: Exploration
+status: Draft
 tags:
   - Exploration
   - Obsidian-Plugin
