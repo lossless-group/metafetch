@@ -26,6 +26,7 @@ const COMMAND_IDS = [
     'direct-fetch-from-script',
     'fetch-via-microlink',
     'fetch-recipe-fireround',
+    'fetch-screenshots-from-website',
     'fetch-from-frontmatter-url',
     'fill-from-folder-profile',
     'create-example-frontmatter-profile',

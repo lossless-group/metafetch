@@ -33,6 +33,7 @@ Full notes: [changelog/releases/0.2.0.md](changelog/releases/0.2.0.md).
 |---|---|---|
 | **Direct fetch from script** | Fetches the page itself and reads its Open Graph, Twitter, schema.org, and scholarly (`citation_*`) tags. | Nothing. No key, no rate limit. |
 | **Fetch via Microlink** | Same fields, through the Microlink API. | Nothing for about 50 requests a day; an optional key raises the limit. |
+| **Fetch screenshots from website** | Takes a screenshot of the site in the note's `url` through Microlink, saves it to your attachments folder, and embeds it under `## Screenshots` with the date it was taken. | Nothing for about 50 requests a day; an optional Microlink key raises the limit. |
 | **Fetch via Fireround** | Writes the company's funding rounds into the note as a `json` block under `## Fundraising History`, exactly as Fireround returned them. Needs the note's `url` to be the company's homepage. | A Firecrawl key. |
 | **Fetch from a frontmatter URL…** | Lists every URL in the note's frontmatter, under any property (`url`, `arxiv`, `doi`…), and fetches the one you pick with the provider you pick. | Depends on the provider. |
 | **Fill frontmatter from folder profile** | Fills the empty fields the note's folder profile asks for, such as a Tooling note's social links, from the company's own homepage. | Nothing. A profile in `zz-cf-lib/frontmatter/`. |

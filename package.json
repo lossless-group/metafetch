@@ -1,6 +1,6 @@
 {
 	"name": "metafetch",
-	"version": "0.2.0",
+	"version": "0.3.0",
 	"description": "Pull OpenGraph metadata from any URL into note frontmatter — title, image, description, publisher — directly, or via OpenGraph.io or Microlink.",
 	"main": "main.js",
 	"scripts": {

@@ -13,6 +13,7 @@ import type { FetchProvider } from './src/modals/SelectUrlModal';
 import { stampIdentityCode } from './src/utils/hexCode';
 import { createExampleProfile, createExampleRecipe, fillFromProfile, listVaultRecipes } from './src/commands/fillFromProfile';
 import { fetchRecipeIntoNote } from './src/commands/fetchRecipeIntoNote';
+import { fetchScreenshotIntoNote } from './src/commands/fetchScreenshotIntoNote';
 import { ALL_BUNDLED_RECIPES, type ModelRecipe } from './src/services/modelRecipes';
 import { mergeProviderSettings } from './src/services/modelProviderSettings';
 import { SelectProfileModal } from './src/modals/SelectProfileModal';
@@ -134,6 +135,15 @@ export default class MetafetchPlugin extends Plugin {
             name: 'Fetch via Microlink',
             editorCallback: (_editor: Editor) => {
                 void this.runFetchScript('microlink');
+            }
+        });
+
+        // Command: screenshot the note's website (Microlink), saved into the vault.
+        this.addCommand({
+            id: 'fetch-screenshots-from-website',
+            name: 'Fetch screenshots from website',
+            editorCallback: (_editor: Editor) => {
+                void fetchScreenshotIntoNote(this.app, this.settings.microlinkApiKey);
             }
         });
 

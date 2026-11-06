@@ -1,7 +1,7 @@
 {
 	"id": "metafetch",
 	"name": "Metafetch",
-	"version": "0.2.0",
+	"version": "0.3.0",
 	"minAppVersion": "1.13.0",
 	"description": "Pull OpenGraph metadata from any URL into note frontmatter — title, image, description, publisher — directly, or via OpenGraph.io or Microlink.",
 	"author": "The Lossless Group",
