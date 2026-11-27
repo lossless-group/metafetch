@@ -20,6 +20,7 @@ It works the same way for notes about papers, articles, and companies. Fetch onc
 - **Nothing gets erased.** If a page has no image, title, or description, your note keeps the one it had.
 - **Better authors, cleaner text.** Apostrophes and HTML entities come through intact. Bylines are found in JSON-LD and visible author lines, and reading times are no longer stored as authors. Bot-check pages count as a failed fetch.
 - **Socials from a folder profile.** For a note under `Tooling/`, Metafetch reads the company's homepage and fills its GitHub org and repo, LinkedIn page, X, YouTube, Discord, and more. It only fills empty fields, and when the page links two equally likely profiles it writes neither.
+- **Books fill themselves in.** A `Sources/Books/` profile looks a book up on Open Library by title and first author, with no key and no `url` needed, and fills its ISBN-13 and ISBN-10, publisher, year, subtitle, Open Library link, and Goodreads link. Google Books joins in once you add a key.
 - **Funding rounds in the note.** **Fetch via Fireround** writes a company's rounds under `## Fundraising History` as a `json` block, exactly as they arrived, and keeps them out of your frontmatter.
 - **Any data API, for what a page doesn't say.** `from: [direct, firecrawl]` falls back to Firecrawl when a site refuses a plain fetch, and Firecrawl Branding adds colours and fonts. One Firecrawl key covers all of it, and any other JSON API is a recipe file, with its own command if you want one.
 - **Any model, for the fields a page can't fill.** Mark a profile field `from: [model]` and Claude, OpenAI, TrustedRouter, a local LM Studio, or any API you describe in a recipe file fills it from the page's text. Keys stay in Obsidian's keychain.
@@ -145,8 +146,20 @@ Sources run in order: the free parse, then data recipes, then a model, which onl
 | `firecrawl` | The page, through Firecrawl's scraper | `title`, `description`, `image`, `favicon`, `site_name`, `type`, `published`, `language`, `keywords` |
 | `firecrawl-branding` | The site's brand, through Firecrawl | `logo`, `favicon`, `image`, `primary_color`, `secondary_color`, `accent_color`, `background_color`, `color_scheme`, `heading_font`, `body_font`, `fonts` |
 | `fireround` | The company's latest round, from [Fireround](https://fireround.dev)'s verified feed | `round`, `round_stage`, `amount`, `amount_usd_millions`, `announced_on`, `lead_investors`, `other_investors`, `total_raised`, `valuation`, `previous_rounds`, `sources`, `fireround_url`, `company_name`, `company_description`, `sector`, `headquarters` |
+| `open-library` | A book on [Open Library](https://openlibrary.org), by title and first author (`book_authors`). No key. ISBNs and publisher come from one edition | `isbn_13`, `isbn_10`, `goodreads_id`, `work_key`, `edition_key`, `title`, `subtitle`, `authors`, `publisher`, `publish_place`, `first_publish_year`, `pages` |
+| `open-library-loose` | The same, tolerating spelling and name variants, for books the exact search misses. Its ISBN-13 may be from any printing (English-language preferred), so it gives no ISBN-10 | `isbn_13`, `goodreads_id`, `work_key`, `title`, `subtitle`, `authors`, `first_publish_year`, `pages` |
+| `google-books` | A book on Google Books, by title and first author. Needs a Google Cloud key with the Books API enabled | `google_books_url`, `isbn_13`, `isbn_10`, `title`, `subtitle`, `authors`, `publisher`, `published`, `pages` |
 
-Fireround is matched on the note's domain, so a company with a similar name is never written. A field the source has no value for stays empty.
+Fireround is matched on the note's domain, so a company with a similar name is never written. The book recipes keep a result only when its title matches the note's, ignoring case, punctuation, and a subtitle after a colon or spaced dash. A field the source has no value for stays empty.
+
+A recipe that never uses `{{url}}` or `{{domain}}`, like the book ones, runs on notes with no `url`. To turn an output into a link, give the field a `format:`:
+
+```yaml
+  goodreads_url:
+    from: [open-library, open-library-loose]
+    value: goodreads_id
+    format: "https://www.goodreads.com/book/show/{{value}}"
+```
 
 ### Providers
 
@@ -166,7 +179,7 @@ API keys are picked from **Obsidian's keychain**, never typed into Metafetch's s
 
 To add any other model API, run **Create example model recipe** and edit the copy. A recipe says where to send the request, where the key goes, what the body looks like (with `{{model}}`, `{{system}}`, `{{prompt}}`, and `{{schema}}` filled in), and where the reply's text is. Recipes are data only, never code.
 
-A data recipe is the same, with `kind: data` and named outputs instead of reply text. Its body can use `{{url}}`, `{{domain}}` (the note's URL without `www.`), and `{{title}}`. With `provider: firecrawl` it borrows the Firecrawl key, which can still only go to Firecrawl's host. That makes anything in Firecrawl's provider catalogue one file away:
+A data recipe is the same, with `kind: data` and named outputs instead of reply text. Its URL and body can use `{{url}}`, `{{domain}}` (the note's URL without `www.`), `{{title}}`, `{{title_main}}` (the title without a run-on subtitle), and `{{fm.<key>}}` for any frontmatter value (a list gives its first item, a wikilink its text). An output path can pick a list item by pattern with `[~regex]`, as in `isbn[~^97\d{11}$]`. With `provider: firecrawl` it borrows the Firecrawl key, which can still only go to Firecrawl's host. That makes anything in Firecrawl's provider catalogue one file away:
 
 ````markdown
 ```cf-recipe

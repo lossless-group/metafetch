@@ -320,7 +320,124 @@ export const BUNDLED_DATA_RECIPES: ModelRecipe[] = [
   },
 ];
 
-export const ALL_BUNDLED_RECIPES: ModelRecipe[] = [...BUNDLED_RECIPES, ...BUNDLED_DATA_RECIPES];
+// Open Library's search returns works; `editions` is the edition it ranks best
+// for the query, so its ISBN and publisher belong to one printing.
+const OL_EDITION = 'editions.docs[0]';
+const ISBN_13 = '[~^97\\d{11}$]';
+const ISBN_10 = '[~^\\d{9}(\\d|X)$]';
+// Registration groups 0 and 1 are the English-language ones; a vault citing an
+// English title wants that printing before a translation's.
+const ISBN_13_EN = '[~^978(0|1)\\d{9}$]';
+const ISBN_10_EN = '[~^(0|1)\\d{8}(\\d|X)$]';
+
+/** Book recipes: looked up by the note's title and first author, never by URL. */
+export const BUNDLED_BOOK_RECIPES: ModelRecipe[] = [
+  {
+    id: 'open-library',
+    kind: 'data',
+    provider: 'open-library',
+    title: 'Open Library',
+    origin: 'bundled',
+    description: 'Book records from the Internet Archive\'s Open Library, found by the note\'s title and first author (book_authors). No key. A result is kept only when its title matches the note\'s. Outputs: isbn_13, isbn_10, goodreads_id, work_key, edition_key, title, subtitle, authors, publisher, publish_place, first_publish_year, pages.',
+    request: {
+      method: 'GET',
+      url: 'https://openlibrary.org/search.json?q=title%3A%22{{title_main}}%22%20author%3A%22{{fm.book_authors}}%22&limit=5&fields=key,title,subtitle,author_name,first_publish_year,isbn,id_goodreads,number_of_pages_median,publisher,publish_place,editions,editions.key,editions.isbn,editions.publisher,editions.publish_place,editions.id_goodreads,editions.subtitle',
+      headers: {},
+      auth: 'none',
+      body: {},
+    },
+    responseText: '',
+    records: 'docs',
+    match: { title: '{{title_main}}' },
+    outputs: {
+      isbn_13: [`${OL_EDITION}.isbn${ISBN_13}`, `isbn${ISBN_13_EN}`, `isbn${ISBN_13}`],
+      isbn_10: [`${OL_EDITION}.isbn${ISBN_10}`, `isbn${ISBN_10_EN}`, `isbn${ISBN_10}`],
+      goodreads_id: [`${OL_EDITION}.id_goodreads[0]`, 'id_goodreads[0]'],
+      work_key: ['key'],
+      edition_key: [`${OL_EDITION}.key`],
+      title: ['title'],
+      subtitle: [`${OL_EDITION}.subtitle`, 'subtitle'],
+      authors: ['author_name'],
+      publisher: [`${OL_EDITION}.publisher[0]`],
+      publish_place: [`${OL_EDITION}.publish_place[0]`],
+      first_publish_year: ['first_publish_year'],
+      pages: ['number_of_pages_median'],
+    },
+    defaultModel: '',
+    defaultBaseUrl: '',
+    allowedHosts: ['openlibrary.org'],
+    enforcesSchema: false,
+  },
+  {
+    id: 'open-library-loose',
+    kind: 'data',
+    provider: 'open-library',
+    title: 'Open Library (loose search)',
+    origin: 'bundled',
+    description: 'A second Open Library search for books the exact one misses: it tolerates spelling and name variants (Tom or Thomas M. Nichols), but returns works without a chosen edition, so its ISBN-13 may be from any printing (and it gives no ISBN-10). The title must still match. Outputs: isbn_13, goodreads_id, work_key, title, subtitle, authors, first_publish_year, pages.',
+    request: {
+      method: 'GET',
+      url: 'https://openlibrary.org/search.json?title={{title_main}}&author={{fm.book_authors}}&limit=5&fields=key,title,subtitle,author_name,first_publish_year,isbn,id_goodreads,number_of_pages_median',
+      headers: {},
+      auth: 'none',
+      body: {},
+    },
+    responseText: '',
+    records: 'docs',
+    match: { title: '{{title_main}}' },
+    outputs: {
+      // No isbn_10: the work's ISBNs span printings, and a pair must not.
+      isbn_13: [`isbn${ISBN_13_EN}`, `isbn${ISBN_13}`],
+      goodreads_id: ['id_goodreads[0]'],
+      work_key: ['key'],
+      title: ['title'],
+      subtitle: ['subtitle'],
+      authors: ['author_name'],
+      first_publish_year: ['first_publish_year'],
+      pages: ['number_of_pages_median'],
+    },
+    defaultModel: '',
+    defaultBaseUrl: '',
+    allowedHosts: ['openlibrary.org'],
+    enforcesSchema: false,
+  },
+  {
+    id: 'google-books',
+    kind: 'data',
+    provider: 'google-books',
+    title: 'Google Books',
+    origin: 'bundled',
+    description: 'Google Books volumes, found by the note\'s title and first author (book_authors). Needs a Google Cloud API key with the Books API enabled; Google no longer answers without one. A result is kept only when its title matches the note\'s. Outputs: google_books_url, isbn_13, isbn_10, title, subtitle, authors, publisher, published, pages.',
+    request: {
+      method: 'GET',
+      url: 'https://www.googleapis.com/books/v1/volumes?q=intitle%3A{{title_main}}%20inauthor%3A{{fm.book_authors}}&maxResults=10&printType=books',
+      headers: {},
+      auth: 'query:key',
+      body: {},
+    },
+    responseText: '',
+    responseError: 'error.message',
+    records: 'items',
+    match: { 'volumeInfo.title': '{{title_main}}' },
+    outputs: {
+      google_books_url: ['volumeInfo.canonicalVolumeLink'],
+      isbn_13: ['volumeInfo.industryIdentifiers[?type=ISBN_13].identifier'],
+      isbn_10: ['volumeInfo.industryIdentifiers[?type=ISBN_10].identifier'],
+      title: ['volumeInfo.title'],
+      subtitle: ['volumeInfo.subtitle'],
+      authors: ['volumeInfo.authors'],
+      publisher: ['volumeInfo.publisher'],
+      published: ['volumeInfo.publishedDate'],
+      pages: ['volumeInfo.pageCount'],
+    },
+    defaultModel: '',
+    defaultBaseUrl: '',
+    allowedHosts: ['www.googleapis.com'],
+    enforcesSchema: false,
+  },
+];
+
+export const ALL_BUNDLED_RECIPES: ModelRecipe[] = [...BUNDLED_RECIPES, ...BUNDLED_DATA_RECIPES, ...BUNDLED_BOOK_RECIPES];
 
 // --- Vault recipes ---------------------------------------------------------
 
@@ -428,13 +545,13 @@ export class ModelCallError extends Error {
  */
 export function substitute(template: unknown, vars: Record<string, unknown>): unknown {
   if (typeof template === 'string') {
-    const whole = template.match(/^\{\{([a-zA-Z]+)\}\}$/);
+    const whole = template.match(/^\{\{([a-zA-Z][\w.]*)\}\}$/);
     if (whole) {
       const name = whole[1] ?? '';
       if (!(name in vars)) throw new ModelCallError(`Unknown recipe variable {{${name}}}`, 'BAD_RECIPE');
       return vars[name];
     }
-    return template.replace(/\{\{([a-zA-Z]+)\}\}/g, (_m, name: string) => {
+    return template.replace(/\{\{([a-zA-Z][\w.]*)\}\}/g, (_m, name: string) => {
       if (!(name in vars)) throw new ModelCallError(`Unknown recipe variable {{${name}}}`, 'BAD_RECIPE');
       const v = vars[name];
       return typeof v === 'string' ? v : JSON.stringify(v);
@@ -449,8 +566,9 @@ export function substitute(template: unknown, vars: Record<string, unknown>): un
 /**
  * Reads one value out of a JSON response. Segments are dot-separated; `[n]`
  * indexes an array, `[-1]` counts from the end, `[?key=value]` takes the
- * first element whose `key` equals `value`, and `[*]` reads the rest of the
- * path from every element, giving a list.
+ * first element whose `key` equals `value`, `[~regex]` takes the first
+ * element whose text matches the regex (no `]` inside it), and `[*]` reads
+ * the rest of the path from every element, giving a list.
  */
 export function readPath(data: unknown, path: string): unknown {
   return walk(data, path.replace(/^\$\.?/, '').match(/[^.[\]]+|\[[^\]]*\]/g) ?? []);
@@ -470,7 +588,15 @@ function walk(data: unknown, parts: string[]): unknown {
       const inner = part.slice(1, -1);
       if (!Array.isArray(cur)) return undefined;
       const filter = inner.match(/^\?([^=]+)=(.*)$/);
-      if (filter) {
+      if (inner.startsWith('~')) {
+        let re: RegExp;
+        try {
+          re = new RegExp(inner.slice(1));
+        } catch {
+          return undefined;
+        }
+        cur = cur.find(el => (typeof el === 'string' || typeof el === 'number') && re.test(String(el)));
+      } else if (filter) {
         const [, key, value] = filter;
         cur = cur.find(el => {
           const v = asRecord(el)?.[key ?? ''];
@@ -647,11 +773,58 @@ export async function callModel(call: ModelCall): Promise<{ values: Record<strin
   return { values, model };
 }
 
-/** What a data recipe can know about the note: its URL, that URL's domain, and its title. */
+/**
+ * What a data recipe can know about the note: its URL, that URL's domain, its
+ * title, and its frontmatter as `{{fm.<key>}}`.
+ */
 export interface NoteVars {
   url: string;
   title: string;
+  frontmatter?: Record<string, unknown>;
 }
+
+/** `[[People/Jane Doe|Jane Doe]]` → `Jane Doe`; other text as is. */
+function unlink(text: string): string {
+  return text.replace(/\[\[([^\]|]*\/)?([^\]|]+)(\|([^\]]+))?\]\]/g, (_m, _dir, target: string, _a, alias?: string) => alias ?? target).trim();
+}
+
+/**
+ * Frontmatter as recipe variables: `fm.<key>` for every key, holding its text,
+ * or a list's first item (a book's first author). Wikilinks become their text.
+ * A key a recipe names that the note lacks is empty, never an error: a missing
+ * author narrows nothing, and the match rules still apply.
+ */
+export function frontmatterVars(recipe: ModelRecipe, fm: Record<string, unknown>): Record<string, string> {
+  const out: Record<string, string> = {};
+  const scalar = (v: unknown): string | undefined => {
+    if (typeof v === 'number') return String(v);
+    // A list item written as a map (`- name: Jane Doe` with `sort_as:`) stands for its name.
+    const named = v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>)['name'] : undefined;
+    if (typeof named === 'string') return unlink(named);
+    return typeof v === 'string' ? unlink(v.replace(/^name:\s*/, '')) : undefined;
+  };
+  for (const [k, v] of Object.entries(fm)) {
+    const s = Array.isArray(v) ? v.map(scalar).find(x => x) : scalar(v);
+    if (s) out[`fm.${k}`] = s;
+  }
+  const template = JSON.stringify([recipe.request.url, recipe.request.body]);
+  for (const m of template.matchAll(/\{\{(fm\.[\w.]+)\}\}/g)) out[m[1] ?? ''] ??= '';
+  return out;
+}
+
+/**
+ * A title without what follows a colon or a spaced dash: "Blue Ocean Strategy:
+ * How to Create…" → "Blue Ocean Strategy". Book catalogues hold the subtitle
+ * apart, and notes often run it on.
+ */
+export function mainTitle(title: string): string {
+  const cut = title.split(/:\s|\s[-–—]\s|\.\s(?=[A-Z])/)[0] ?? title;
+  return cut.trim() || title.trim();
+}
+
+/** True when a recipe's request uses the note's URL or domain. */
+export const recipeNeedsUrl = (recipe: ModelRecipe): boolean =>
+  /\{\{(url|domain)\}\}/.test(JSON.stringify([recipe.request.url, recipe.request.body]));
 
 /** `www.example.com` → `example.com`; empty for an unreadable URL. */
 export function domainOf(url: string): string {
@@ -708,9 +881,12 @@ export async function fetchRecords(call: DataCall): Promise<unknown[]> {
   if (recipe.homepageOnly && !isHomepage(call.note.url)) {
     throw new ModelCallError(`${recipe.title} skipped: ${call.note.url} is not a homepage, and what it finds there could belong to the host.`, 'NOT_HOMEPAGE');
   }
+  if (!call.note.url && recipeNeedsUrl(recipe)) {
+    throw new ModelCallError(`${recipe.title} skipped: the note has no url to look up.`, 'NO_URL');
+  }
   const provider = call.providers[keyHolder.id] ?? { secret: '', model: '', baseUrl: '', approvedHosts: '' };
 
-  const vars = { url: call.note.url, domain: domainOf(call.note.url), title: call.note.title };
+  const vars = { url: call.note.url, domain: domainOf(call.note.url), title: call.note.title, title_main: mainTitle(call.note.title), ...frontmatterVars(recipe, call.note.frontmatter ?? {}) };
   const baseUrl = (provider.baseUrl.trim() || keyHolder.defaultBaseUrl).replace(/\/+$/, '');
   const urlVars = { baseUrl, ...Object.fromEntries(Object.entries(vars).map(([k, v]) => [k, encodeURIComponent(v)])) };
   const data = await send({ recipe, keyHolder, provider, getSecret: call.getSecret, vars, urlVars });
@@ -726,11 +902,22 @@ export async function fetchRecords(call: DataCall): Promise<unknown[]> {
   if (!recipe.records) return [data];
   const list = readPath(data, recipe.records);
   if (!Array.isArray(list)) return [];
-  const want = Object.entries(recipe.match ?? {}).map(([path, v]) => [path, String(substitute(v, vars)).trim().toLowerCase()] as const);
+  const want = Object.entries(recipe.match ?? {}).map(([path, v]) => [path, matchKey(String(substitute(v, vars)))] as const);
   return (list as unknown[]).filter(rec => want.every(([path, v]) => {
     const got = readPath(rec, path);
-    return (typeof got === 'string' || typeof got === 'number') && String(got).trim().toLowerCase() === v;
+    if (typeof got !== 'string' && typeof got !== 'number') return false;
+    // A record's title may carry its subtitle too; its main title counts.
+    return matchKey(String(got)) === v || matchKey(mainTitle(String(got))) === v;
   }));
+}
+
+/**
+ * How match values compare: case, punctuation, and spacing aside, so
+ * "A pattern language" matches "A Pattern Language" and "Chip War:" matches
+ * "Chip War". Letters and digits must still agree exactly.
+ */
+export function matchKey(text: string): string {
+  return text.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/&/g, ' and ').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 }
 
 /** Runs one data recipe for a note and returns every output it could read, by name, from the first match. */

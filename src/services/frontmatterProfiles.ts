@@ -45,6 +45,8 @@ export interface ProfileField {
   recipes: string[];
   /** The recipe output to read; defaults to the `page` value. */
   value?: string;
+  /** Wraps a recipe's text output: `https://www.goodreads.com/book/show/{{value}}`. */
+  format?: string;
   /** A model may fill it, when the direct parser didn't. */
   model?: ModelFieldSpec;
 }
@@ -218,6 +220,9 @@ export function parseProfile(content: string, path: string): FrontmatterProfile 
       recipes,
     };
     if (value) field.value = value;
+    const format = typeof spec['format'] === 'string' ? spec['format'].trim() : '';
+    if (format && !format.includes('{{value}}')) problems.push(`${key}: format needs {{value}} where the recipe's value goes; it was ignored`);
+    else if (format) field.format = format;
     if (platform !== undefined) field.platform = platform;
     if (page !== undefined) field.page = page;
     if (wantsModel) field.model = { describe, type: type === 'enum' || type === 'list' ? type : 'string', values };
@@ -317,6 +322,14 @@ export function planFill(
 
 /** The recipe output a field reads. */
 export const recipeOutput = (field: ProfileField): string | undefined => field.value ?? field.page;
+
+/** A recipe value shaped by the field's `format`, which applies to text and numbers (each item of a list). */
+export function formatRecipeValue(field: ProfileField, value: unknown): unknown {
+  const { format } = field;
+  if (!format) return value;
+  const one = (v: unknown) => (typeof v === 'string' || typeof v === 'number' ? format.replace(/\{\{value\}\}/g, String(v)) : v);
+  return Array.isArray(value) ? value.map(one) : one(value);
+}
 
 /**
  * The JSON Schema a model reply must match: one property per field, each

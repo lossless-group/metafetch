@@ -20,6 +20,7 @@ import {
   modelPrompt,
   acceptModelValue,
   recipeOutput,
+  formatRecipeValue,
   type FillReport,
   type FrontmatterProfile,
 } from '../services/frontmatterProfiles';
@@ -118,18 +119,25 @@ export async function fillFromProfile(app: App, options: FillOptions, pick: Prof
   const content = await app.vault.read(file);
   const fm = extractFrontmatter(content) ?? {};
   const url = typeof fm['url'] === 'string' ? fm['url'].trim() : '';
-  if (!url) {
-    new Notice('Metafetch: this note has no web address in its frontmatter to read from.');
-    return;
-  }
 
   if (profile.fields.every(f => fieldIsSet(f, fm))) {
     new Notice(`Metafetch (${profile.title}): every field is already set.`);
     return;
   }
 
-  const pending = new Notice(`Metafetch (${profile.title}): reading ${url}…`, 0);
-  const pageFetch = await tryFetch(url);
+  // The page is read only for fields that come from it (or a model reading
+  // it). A profile of data recipes looked up by title, like Books, needs no url.
+  const open = profile.fields.filter(f => !fieldIsSet(f, fm));
+  const needsPage = open.some(f => f.runnable || f.model);
+  if (!url && !open.some(f => f.recipes.length > 0)) {
+    new Notice('Metafetch: this note has no web address in its frontmatter to read from.');
+    return;
+  }
+
+  const pending = new Notice(`Metafetch (${profile.title}): ${url && needsPage ? `reading ${url}` : 'looking up'}…`, 0);
+  const pageFetch: { html: string } | { error: string } = url && needsPage
+    ? await tryFetch(url)
+    : { error: url ? 'not needed' : 'the note has no url' };
   let page: OpenGraphData | null = null;
   let pageError: string | null = 'error' in pageFetch ? pageFetch.error : null;
   if ('html' in pageFetch) {
@@ -193,7 +201,8 @@ export async function fillFromProfile(app: App, options: FillOptions, pick: Prof
               recipes: options.recipes,
               providers: options.providers,
               getSecret: options.getSecret,
-              note: { url, title },
+              // Values found earlier in this run count, so a later recipe can use them.
+              note: { url, title, frontmatter: { ...fm, ...values } },
             }));
           } catch (err) {
             recipeNotes.push(err instanceof Error ? err.message : `${recipe.title} failed`);
@@ -202,7 +211,8 @@ export async function fillFromProfile(app: App, options: FillOptions, pick: Prof
             working.hide();
           }
         }
-        const v = output ? results.get(id)?.[output] : undefined;
+        const raw = output ? results.get(id)?.[output] : undefined;
+        const v = raw === undefined ? undefined : formatRecipeValue(field, raw);
         if (v !== undefined) {
           values[key] = v;
           report.filled.push(key);
@@ -269,7 +279,7 @@ export async function fillFromProfile(app: App, options: FillOptions, pick: Prof
       }
     });
   }
-  const recipeNote = recipeNotes.length ? ` ${[...new Set(recipeNotes)].join('. ')}.` : '';
+  const recipeNote = recipeNotes.length ? ` ${[...new Set(recipeNotes.map(n => n.replace(/\.+$/, '')))].join('. ')}.` : '';
   new Notice(summarize(profile, report) + recipeNote + modelNote, 15000);
   for (const a of report.ambiguous) console.debug(`Metafetch: ${file.path} ${a.key} candidates:`, a.candidates);
 }
