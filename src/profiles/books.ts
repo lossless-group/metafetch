@@ -23,6 +23,7 @@ How a book is matched:
 2. ISBN-13, ISBN-10, publisher, and place come from the one edition Open Library ranks best for that search, so they describe the same printing. That edition isn't always the one in the note's \`publisher\`; check the ISBN when the printing matters.
 3. When the exact search finds nothing, a looser one (**Open Library (loose search)**) tolerates spelling and name variants. Its ISBN may come from any printing, and it fills no publisher.
 4. \`goodreads_url\` is written only when Open Library holds a Goodreads ID for the book. It is never guessed, and never asked of a model.
+   \`cover_image\` is likewise written only when Open Library holds a cover for the book, as a link to that cover on covers.openlibrary.org.
 5. **Google Books** needs an API key (Metafetch settings → Google Books). Without one, \`google_books_url\` is reported as not found and everything else still fills from Open Library.
 
 These fields are the raw material for an AMA citation: author, title, subtitle, edition, place, publisher, year.
@@ -59,6 +60,10 @@ fields:
     from: [open-library, open-library-loose]
     value: goodreads_id
     format: "https://www.goodreads.com/book/show/{{value}}"
+  cover_image:
+    from: [open-library, open-library-loose]
+    value: cover_id
+    format: "https://covers.openlibrary.org/b/id/{{value}}-L.jpg"
   google_books_url:
     from: [google-books]
     value: google_books_url

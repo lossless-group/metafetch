@@ -38,6 +38,7 @@ const CHIP_WAR = {
     first_publish_year: 2022,
     isbn: ['9786075696324', '1982172002', '9781982172008'],
     id_goodreads: ['60321447'],
+    cover_i: 12968901,
     editions: { docs: [{ key: '/books/OL1M', publisher: ['Scribner'], isbn: ['1982172010', '9781982172015'] }] },
 };
 
@@ -192,6 +193,7 @@ describe('Fetch book reference details for frontmatter', () => {
         assert.equal(fm['year_first_published'], 2022);
         assert.equal(fm['goodreads_url'], 'https://www.goodreads.com/book/show/60321447');
         assert.equal(fm['open_library_url'], 'https://openlibrary.org/works/OL27846746W');
+        assert.equal(fm['cover_image'], 'https://covers.openlibrary.org/b/id/12968901-L.jpg');
     });
 
     test('a books.md in the profiles folder takes the bundled one\'s place', async () => {
