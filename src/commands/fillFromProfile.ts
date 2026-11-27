@@ -28,6 +28,7 @@ import type { OpenGraphData } from '../types/open-graph-service';
 import { extractFrontmatter } from '../utils/yamlFrontmatter';
 import { TOOLING_SOCIALS_FILENAME, TOOLING_SOCIALS_PROFILE } from '../profiles/toolingSocials';
 import { EXAMPLE_RECIPE, EXAMPLE_RECIPE_FILENAME } from '../profiles/exampleRecipe';
+import { BOOKS_PROFILE, BOOKS_PROFILE_FILENAME } from '../profiles/books';
 
 export type ProfilePicker = (profiles: FrontmatterProfile[]) => Promise<FrontmatterProfile | null>;
 
@@ -115,7 +116,42 @@ export async function fillFromProfile(app: App, options: FillOptions, pick: Prof
   }
   const profile = tie ? await pick(matches) : matches[0] ?? null;
   if (!profile) return;
+  await fillNoteWithProfile(app, options, file, profile);
+}
 
+/**
+ * The Books profile: the vault's `books.md` in the profiles folder when it
+ * has one (so its fields can be edited), otherwise the one bundled with
+ * Metafetch, which needs nothing in the vault.
+ */
+export async function booksProfile(app: App, profilesRoot: string): Promise<FrontmatterProfile> {
+  const path = normalizePath(`${profilesRoot}/${BOOKS_PROFILE_FILENAME}`);
+  const file = app.vault.getAbstractFileByPath(path);
+  if (file instanceof TFile) {
+    const vault = parseProfile(await app.vault.cachedRead(file), file.path);
+    if (vault && vault.fields.length > 0) return vault;
+  }
+  const bundled = parseProfile(BOOKS_PROFILE, `(bundled) ${BOOKS_PROFILE_FILENAME}`);
+  if (!bundled) throw new Error('Metafetch: the bundled Books profile failed to parse');
+  return bundled;
+}
+
+/**
+ * "Fetch book reference details for frontmatter": the Books profile on the
+ * active note, wherever it lives. A book note needs a title and, for a
+ * confident match, its first author in book_authors.
+ */
+export async function fetchBookDetails(app: App, options: FillOptions): Promise<void> {
+  const file = app.workspace.getActiveFile();
+  if (!(file instanceof TFile)) {
+    new Notice('Metafetch: no active file');
+    return;
+  }
+  await fillNoteWithProfile(app, options, file, await booksProfile(app, options.profilesRoot));
+}
+
+/** Fills one note's empty fields from one profile: page, socials, data recipes, then a model. */
+export async function fillNoteWithProfile(app: App, options: FillOptions, file: TFile, profile: FrontmatterProfile): Promise<void> {
   const content = await app.vault.read(file);
   const fm = extractFrontmatter(content) ?? {};
   const url = typeof fm['url'] === 'string' ? fm['url'].trim() : '';
@@ -287,6 +323,7 @@ export async function fillFromProfile(app: App, options: FillOptions, pick: Prof
 /** Writes the Tooling socials example into the profiles folder, unless it's already there. */
 export async function createExampleProfile(app: App, profilesRoot: string): Promise<void> {
   await writeExample(app, profilesRoot, TOOLING_SOCIALS_FILENAME, TOOLING_SOCIALS_PROFILE, 'Edit its fields block to change what Tooling notes get.');
+  await writeExample(app, profilesRoot, BOOKS_PROFILE_FILENAME, BOOKS_PROFILE, 'Edit its fields block to change what book notes get.');
 }
 
 /** Writes the example model recipe into the recipes folder, unless it's already there. */

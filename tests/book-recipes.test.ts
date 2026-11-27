@@ -12,7 +12,7 @@ import {
 } from '../src/services/modelRecipes';
 import { defaultProviderSettings } from '../src/services/modelProviderSettings';
 import { formatRecipeValue, parseProfile } from '../src/services/frontmatterProfiles';
-import { fillFromProfile, type FillOptions } from '../src/commands/fillFromProfile';
+import { booksProfile, fetchBookDetails, fillFromProfile, type FillOptions } from '../src/commands/fillFromProfile';
 import { extractFrontmatter, withFrontmatter } from '../src/utils/yamlFrontmatter';
 
 interface Sent { url: string }
@@ -155,5 +155,55 @@ fields:
         assert.equal(fm['goodreads_url'], 'https://www.goodreads.com/book/show/60321447');
         assert.equal(fm['publisher'], 'Simon & Schuster');
         assert.equal(fm['google_books_url'], undefined);
+    });
+});
+
+describe('Fetch book reference details for frontmatter', () => {
+    function vault(files: Record<string, string>, active: string) {
+        const objs = Object.keys(files).map(path => Object.assign(new TFile(), { path, basename: path.split('/').pop()!.replace(/\.md$/, ''), parent: { path: path.split('/').slice(0, -1).join('/') } }));
+        const app = {
+            workspace: { getActiveFile: () => objs.find(o => o.path === active) },
+            vault: {
+                getMarkdownFiles: () => objs,
+                getAbstractFileByPath: (p: string) => objs.find(o => o.path === p) ?? null,
+                cachedRead: (f: { path: string }) => Promise.resolve(files[f.path] ?? ''),
+                read: (f: { path: string }) => Promise.resolve(files[f.path] ?? ''),
+            },
+            fileManager: {
+                processFrontMatter: (f: { path: string }, fn: (fm: Record<string, unknown>) => void) => {
+                    const fm = extractFrontmatter(files[f.path] ?? '') ?? {};
+                    fn(fm);
+                    files[f.path] = withFrontmatter(files[f.path] ?? '', fm);
+                    return Promise.resolve();
+                },
+            },
+        } as unknown as App;
+        return app;
+    }
+    const options: FillOptions = { profilesRoot: 'zz-cf-lib/frontmatter', recipes: ALL_BUNDLED_RECIPES, providers: providers(), defaultModelProvider: 'anthropic', getSecret: noKeys };
+    const NOTE = '---\ntitle: Chip War\nbook_authors:\n  - Chris Miller\n---\n';
+
+    test('works on a note in any folder, with nothing in the vault: the bundled profile', async () => {
+        const files: Record<string, string> = { 'Reading/Chip War.md': NOTE };
+        serve(() => ({ json: { docs: [CHIP_WAR] } }));
+        await fetchBookDetails(vault(files, 'Reading/Chip War.md'), options);
+        const fm = extractFrontmatter(files['Reading/Chip War.md']!)!;
+        assert.equal(fm['isbn_13'], '9781982172015');
+        assert.equal(fm['year_first_published'], 2022);
+        assert.equal(fm['goodreads_url'], 'https://www.goodreads.com/book/show/60321447');
+        assert.equal(fm['open_library_url'], 'https://openlibrary.org/works/OL27846746W');
+    });
+
+    test('a books.md in the profiles folder takes the bundled one\'s place', async () => {
+        const files: Record<string, string> = {
+            'zz-cf-lib/frontmatter/books.md': '---\napplies-to-paths: ["Sources/Books/**"]\n---\n```metafetch-profile\nfields:\n  isbn: { from: [open-library], value: isbn_13 }\n```\n',
+            'Reading/Chip War.md': NOTE,
+        };
+        serve(() => ({ json: { docs: [CHIP_WAR] } }));
+        assert.equal((await booksProfile(vault(files, 'Reading/Chip War.md'), 'zz-cf-lib/frontmatter')).fields.length, 1);
+        await fetchBookDetails(vault(files, 'Reading/Chip War.md'), options);
+        const fm = extractFrontmatter(files['Reading/Chip War.md']!)!;
+        assert.equal(fm['isbn'], '9781982172015');
+        assert.equal(fm['isbn_13'], undefined);
     });
 });

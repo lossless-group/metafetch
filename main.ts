@@ -11,7 +11,7 @@ import { collectFrontmatterUrls } from './src/utils/frontmatterUrls';
 import { SelectUrlModal } from './src/modals/SelectUrlModal';
 import type { FetchProvider } from './src/modals/SelectUrlModal';
 import { stampIdentityCode } from './src/utils/hexCode';
-import { createExampleProfile, createExampleRecipe, fillFromProfile, listVaultRecipes } from './src/commands/fillFromProfile';
+import { createExampleProfile, createExampleRecipe, fetchBookDetails, fillFromProfile, listVaultRecipes, type FillOptions } from './src/commands/fillFromProfile';
 import { fetchRecipeIntoNote } from './src/commands/fetchRecipeIntoNote';
 import { fetchScreenshotIntoNote } from './src/commands/fetchScreenshotIntoNote';
 import { ALL_BUNDLED_RECIPES, type ModelRecipe } from './src/services/modelRecipes';
@@ -165,13 +165,17 @@ export default class MetafetchPlugin extends Plugin {
             id: 'fill-from-folder-profile',
             name: 'Fill frontmatter from folder profile',
             editorCallback: (_editor: Editor) => {
-                void this.loadRecipes().then(() => fillFromProfile(this.app, {
-                    profilesRoot: this.settings.profilesRoot,
-                    recipes: this.recipes,
-                    providers: this.settings.modelProviders,
-                    defaultModelProvider: this.settings.defaultModelProvider,
-                    getSecret: name => this.app.secretStorage.getSecret(name),
-                }, profiles => this.pickProfile(profiles)));
+                void this.loadRecipes().then(() => fillFromProfile(this.app, this.fillOptions(), profiles => this.pickProfile(profiles)));
+            }
+        });
+
+        // Command: a book's ISBNs, publisher, year, and Open Library /
+        // Goodreads / Google Books links, on any note, from the Books profile.
+        this.addCommand({
+            id: 'fetch-book-reference-details',
+            name: 'Fetch book reference details for frontmatter',
+            editorCallback: (_editor: Editor) => {
+                void this.loadRecipes().then(() => fetchBookDetails(this.app, this.fillOptions()));
             }
         });
 
@@ -192,7 +196,17 @@ export default class MetafetchPlugin extends Plugin {
         });
     }
 
-    private pickProfile(profiles: FrontmatterProfile[]): Promise<FrontmatterProfile | null> {
+    private fillOptions(): FillOptions {
+        return {
+            profilesRoot: this.settings.profilesRoot,
+            recipes: this.recipes,
+            providers: this.settings.modelProviders,
+            defaultModelProvider: this.settings.defaultModelProvider,
+            getSecret: name => this.app.secretStorage.getSecret(name),
+        };
+    }
+
+        private pickProfile(profiles: FrontmatterProfile[]): Promise<FrontmatterProfile | null> {
         return new Promise(resolve => new SelectProfileModal(this.app, profiles, resolve).open());
     }
 

@@ -29,6 +29,7 @@ const COMMAND_IDS = [
     'fetch-screenshots-from-website',
     'fetch-from-frontmatter-url',
     'fill-from-folder-profile',
+    'fetch-book-reference-details',
     'create-example-frontmatter-profile',
     'create-example-model-recipe',
 ];
